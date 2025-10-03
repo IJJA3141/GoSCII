@@ -6,8 +6,6 @@ import (
 )
 
 func InvertLuminosity(_img image.Image) image.Image {
-	const A = 65535
-
 	bounds := _img.Bounds()
 	out := image.NewRGBA(bounds)
 
@@ -29,4 +27,48 @@ func InvertLuminosity(_img image.Image) image.Image {
 	}
 
 	return out
+}
+
+// func job(in []uint8, channel chan bool) {
+// 	for x := 0; x < len(in); x += 4 {
+// 		in[x] = ^in[x]
+// 		in[x+1] = ^in[x+1]
+// 		in[x+2] = ^in[x+2]
+// 	}
+//
+// 	channel <- true
+// }
+//
+// func InvertLuminosity2(_img *image.NRGBA) *image.NRGBA {
+// 	channel := make(chan bool)
+//
+// 	for y := _img.Bounds().Min.Y; y < _img.Bounds().Max.Y; y++ {
+// 		start := (y - _img.Rect.Min.Y) * _img.Stride
+// 		end := start + _img.Rect.Dx()*4 // 4 bytes per pixel (R,G,B,A)
+// 		go job(_img.Pix[start:end], channel)
+// 	}
+//
+// 	for range _img.Bounds().Dy() {
+// 		<-channel
+// 	}
+//
+// 	return _img
+// }
+
+func job(in []uint8) {
+	for x := 0; x < len(in); x += 4 {
+		in[x] = ^in[x]
+		in[x+1] = ^in[x+1]
+		in[x+2] = ^in[x+2]
+	}
+}
+
+func InvertLuminosity2(_img *image.NRGBA) *image.NRGBA {
+	for y := _img.Bounds().Min.Y; y < _img.Bounds().Max.Y; y++ {
+		start := (y - _img.Rect.Min.Y) * _img.Stride
+		end := start + _img.Rect.Dx()*4 // 4 bytes per pixel (R,G,B,A)
+		go job(_img.Pix[start:end])
+	}
+
+	return _img
 }

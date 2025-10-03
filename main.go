@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/IJJA3141/GoSCII/filters"
 	"image"
 	_ "image/jpeg"
 	"image/png"
 	"os"
+
+	"github.com/IJJA3141/GoSCII/filters"
 )
 
 func createBoolFlag(_ptr *bool, _name string, _value bool, _desc string) {
@@ -63,17 +64,38 @@ func main() {
 	fmt.Println(in)
 	fmt.Println(out)
 
-	img, _, err := loadImage(in)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// img, _, err := loadImage(in)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	c := filters.Resize(img,
-		image.Rectangle{
-			image.Pt(0, 0),
-			image.Pt(int(float64(img.Bounds().Dx())*1.5), int(float64(img.Bounds().Dy())*1.5)),
-		}, 1)
+	imge := image.NewNRGBA(image.Rect(0, 0, 50000, 50000))
+	// var img image.Image
+	//
+	// img = imge.SubImage(image.Rect(0, 0, 5000, 5000))
+	//
+	// start := time.Now()
+	// c := filters.InvertLuminosity2(imge)
+	// t := time.Now()
+	// elapsed1 := t.Sub(start)
+	//
+	// start = time.Now()
+	// _ = filters.InvertLuminosity(img)
+	// t = time.Now()
+	// elapsed2 := t.Sub(start)
+	//
+	// fmt.Println(elapsed1)
+	// fmt.Println(elapsed2)
+
+	// imge := img.(*image.NRGBA)
+	c := filters.InvertLuminosity2(imge)
+
+	// c := filters.Resize(img,
+	// 	image.Rectangle{
+	// 		image.Pt(0, 0),
+	// 		image.Pt(int(float64(img.Bounds().Dx())*1.5), int(float64(img.Bounds().Dy())*1.5)),
+	// 	}, 1)
 	// d := filters.Resize(img, image.Rectangle{image.Pt(0, 0), image.Pt(img.Bounds().Dx()/2, img.Bounds().Dy()/2)}, 5)
 	// e := filters.Resize(img, image.Rectangle{image.Pt(0, 0), image.Pt(img.Bounds().Dx()*2, img.Bounds().Dy()/2)}, 5)
 
