@@ -8,48 +8,72 @@ import (
 
 const Pi2 = math.Pi * math.Pi
 
-func lanczosKernel(x, a float64) float64 {
+func sinc(x float64) float64 {
 	if x == 0 {
 		return 1
-	} else if -a <= x && x < a {
-		return (a * math.Sin(math.Pi*x) * math.Sin(math.Pi*x/a) / (Pi2 * x * x))
+	} else {
+		return math.Sin(math.Pi*x) / (x * math.Pi)
+	}
+}
+
+func lanczosKernel(x, a float64) float64 {
+	if -a <= x && x < a {
+		return sinc(x) * sinc(x/a)
 	} else {
 		return 0
 	}
 }
 
 func l2(x, y, a float64) float64 {
-	return lanczosKernel(x, a) * lanczosKernel(y, a)
+	return lanczosKernel(math.Sqrt(x*x+y*y), a)
 }
 
-func Resize(_img image.Image, _size image.Rectangle, a float64) image.Image {
+func clamp(x float64) uint8 {
+	if uint32(x) < 256 {
+		return uint8(x)
+	}
+	if x > 255 {
+		return 255
+	}
+	return 0
+}
+
+func Resize2(_img *image.NRGBA, _size image.Rectangle, _a float64) *image.NRGBA {
 	bounds := _img.Bounds()
-	out := image.NewRGBA(_size)
+	out := image.NewNRGBA(_size)
 
 	xStep := float64(bounds.Dx()) / float64(_size.Dx())
 	yStep := float64(bounds.Dy()) / float64(_size.Dy())
 
 	for x := _size.Min.X; x < _size.Max.X; x++ {
-		xAt := xStep * float64(x+1)
+		xSource := (float64(x)+0.5)*xStep - 0.5
 
 		for y := _size.Min.Y; y < _size.Max.Y; y++ {
-			yAt := yStep * float64(y+1)
+			ySource := (float64(y)+0.5)*yStep - 0.5
 
-			newColor := color.RGBA{}
+			var w, R, G, B, A float64
 
-			for i := int(math.Floor(xAt) - a + 1); i <= int(math.Floor(xAt)+a); i++ {
-				for j := int(math.Floor(yAt) - a + 1); j <= int(math.Floor(yAt)+a); j++ {
-					c := l2(xAt-float64(i), yAt-float64(j), a)
-					r, g, b, aa := _img.At(i, j).RGBA()
+			for i := -_a + 1; i <= _a; i++ {
+				for j := -_a + 1; j <= _a; j++ {
 
-					newColor.R += uint8(float64(uint8(r >> 8)) * c)
-					newColor.G += uint8(float64(uint8(g >> 8)) * c)
-					newColor.B += uint8(float64(uint8(b >> 8)) * c)
-					newColor.A += uint8(float64(uint8(aa >> 8)) * c)
+					c := l2(i-xSource+math.Floor(xSource), j-ySource+math.Floor(ySource), _a)
+
+					pix := _img.NRGBAAt(int(math.Floor(xSource)-i), int(math.Floor(ySource)-j))
+
+					w += c
+					A += float64(pix.A) * c
+					R += float64(pix.R) * c
+					G += float64(pix.G) * c
+					B += float64(pix.B) * c
 				}
 			}
 
-			out.SetRGBA(x, y, newColor)
+			R /= w
+			G /= w
+			B /= w
+			A /= w
+
+			out.SetNRGBA(x, y, color.NRGBA{clamp(R), clamp(G), clamp(B), clamp(A)})
 		}
 	}
 

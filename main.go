@@ -7,9 +7,18 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"os"
+	"reflect"
 
 	"github.com/IJJA3141/GoSCII/filters"
 )
+
+func getType(myvar any) string {
+	if t := reflect.TypeOf(myvar); t.Kind() == reflect.Pointer {
+		return "*" + t.Elem().Name()
+	} else {
+		return t.Name()
+	}
+}
 
 func createBoolFlag(_ptr *bool, _name string, _value bool, _desc string) {
 	flag.BoolVar(_ptr, _name, _value, _desc)
@@ -58,69 +67,40 @@ func loadImage(_path string) (image.Image, string, error) {
 	return image, format, err
 }
 
+func toNrgba(_img image.Image) *image.NRGBA {
+	nrgba, ok := _img.(*image.NRGBA)
+	if ok {
+		return nrgba
+	}
+
+	out := image.NewNRGBA(_img.Bounds())
+	for x := range _img.Bounds().Dx() {
+		for y := range _img.Bounds().Dy() {
+			out.Set(x, y, _img.At(x, y))
+		}
+	}
+
+	return out
+}
+
 func main() {
 	flag.Parse()
 
 	fmt.Println(in)
 	fmt.Println(out)
 
-	// img, _, err := loadImage(in)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
+	img, _, err := loadImage(in)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	imge := image.NewNRGBA(image.Rect(0, 0, 50000, 50000))
-	// var img image.Image
-	//
-	// img = imge.SubImage(image.Rect(0, 0, 5000, 5000))
-	//
-	// start := time.Now()
-	// c := filters.InvertLuminosity2(imge)
-	// t := time.Now()
-	// elapsed1 := t.Sub(start)
-	//
-	// start = time.Now()
-	// _ = filters.InvertLuminosity(img)
-	// t = time.Now()
-	// elapsed2 := t.Sub(start)
-	//
-	// fmt.Println(elapsed1)
-	// fmt.Println(elapsed2)
+	nrgba := toNrgba(img)
 
-	// imge := img.(*image.NRGBA)
-	c := filters.InvertLuminosity2(imge)
-
-	// c := filters.Resize(img,
-	// 	image.Rectangle{
-	// 		image.Pt(0, 0),
-	// 		image.Pt(int(float64(img.Bounds().Dx())*1.5), int(float64(img.Bounds().Dy())*1.5)),
-	// 	}, 1)
-	// d := filters.Resize(img, image.Rectangle{image.Pt(0, 0), image.Pt(img.Bounds().Dx()/2, img.Bounds().Dy()/2)}, 5)
-	// e := filters.Resize(img, image.Rectangle{image.Pt(0, 0), image.Pt(img.Bounds().Dx()*2, img.Bounds().Dy()/2)}, 5)
-
-	// a := grayScale(img)
-	// b := filters.Sobel(a)
-	// c := filters.SobelToImg(b)
-
-	// c := filters.InvertLuminosity(img)
-	//
-	// outfile, _ := os.Create("out1.pgn")
-	// defer outfile.Close()
-	// png.Encode(outfile, c)
-	//
-	// c = filters.InvertLuminosity(c)
-	// c = filters.InvertLuminosity(c)
+	c := filters.Resize2(nrgba, image.Rect(0, 0, img.Bounds().Dx()*2, img.Bounds().Dy()*2), 3)
+	// c := nrgba
 
 	outfile, _ := os.Create(out)
 	defer outfile.Close()
 	png.Encode(outfile, c)
-	//
-	// outfile, _ = os.Create("out2.png")
-	// defer outfile.Close()
-	// png.Encode(outfile, d)
-	//
-	// outfile, _ = os.Create("out3.png")
-	// defer outfile.Close()
-	// png.Encode(outfile, e)
 }
