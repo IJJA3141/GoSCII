@@ -84,6 +84,7 @@ func toNrgba(_img image.Image) *image.NRGBA {
 }
 
 func main() {
+
 	flag.Parse()
 
 	fmt.Println(in)
@@ -97,7 +98,7 @@ func main() {
 
 	nrgba := toNrgba(img)
 
-	c := filters.Resize2(nrgba, image.Rect(0, 0, img.Bounds().Dx()*2, img.Bounds().Dy()*2), 3)
+	c := filters.Patch(nrgba, image.Rect(0, 0, img.Bounds().Dx()*2, img.Bounds().Dy()*2), 3)
 	// c := nrgba
 
 	outfile, _ := os.Create(out)

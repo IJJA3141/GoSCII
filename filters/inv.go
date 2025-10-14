@@ -14,7 +14,7 @@ func worker(in []uint8, Min, Max int, c chan bool) {
 	c <- true
 }
 
-const PARA = 500
+const PARA = 5000
 
 func InvertLuminosity(_img *image.NRGBA) *image.NRGBA {
 	workers := 0
