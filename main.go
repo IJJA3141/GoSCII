@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/IJJA3141/GoSCII/filters"
 )
@@ -98,8 +99,14 @@ func main() {
 
 	nrgba := toNrgba(img)
 
-	c := filters.Patch(nrgba, image.Rect(0, 0, img.Bounds().Dx()*2, img.Bounds().Dy()*2), 3)
-	// c := nrgba
+	var c *image.NRGBA
+
+	t1 := time.Now()
+	for range 1 {
+		c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 5000, 2)
+	}
+	t2 := time.Now()
+	fmt.Println(t2.Sub(t1) / 10)
 
 	outfile, _ := os.Create(out)
 	defer outfile.Close()
