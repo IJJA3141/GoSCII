@@ -1,6 +1,8 @@
 package filters
 
-import "image"
+import (
+	"image"
+)
 
 func convolution(_img *image.Gray, _kern [][]float64) [][]float64 {
 	kernBounds := image.Rectangle{image.Pt(0, 0), image.Pt(len(_kern), len(_kern[0]))}

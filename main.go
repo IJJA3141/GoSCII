@@ -44,19 +44,6 @@ func init() {
 	createStringFlag(&out, "out", "out.png", "path to the output image")
 }
 
-func grayScale(_img image.Image) *image.Gray {
-	bounds := _img.Bounds()
-	img := image.NewGray(bounds)
-
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			img.Set(x, y, _img.At(x, y))
-		}
-	}
-
-	return img
-}
-
 func loadImage(_path string) (image.Image, string, error) {
 	file, err := os.Open(_path)
 	if err != nil {
@@ -85,11 +72,7 @@ func toNrgba(_img image.Image) *image.NRGBA {
 }
 
 func main() {
-
 	flag.Parse()
-
-	fmt.Println(in)
-	fmt.Println(out)
 
 	img, _, err := loadImage(in)
 	if err != nil {
@@ -98,15 +81,15 @@ func main() {
 	}
 
 	nrgba := toNrgba(img)
-
 	var c *image.NRGBA
 
 	t1 := time.Now()
 	for range 1 {
-		c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 5000, 2)
+		// c = filters.Resize2(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 5000, 3)
+		c = filters.InvertLuminosity(nrgba)
 	}
 	t2 := time.Now()
-	fmt.Println(t2.Sub(t1) / 10)
+	fmt.Println(t2.Sub(t1))
 
 	outfile, _ := os.Create(out)
 	defer outfile.Close()
