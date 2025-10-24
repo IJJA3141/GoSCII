@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"os"
 	"reflect"
+	"runtime"
 	"time"
 
 	"github.com/IJJA3141/GoSCII/filters"
@@ -84,10 +85,8 @@ func main() {
 	var c *image.NRGBA
 
 	t1 := time.Now()
-	for range 1 {
-		// c = filters.Resize2(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 5000, 3)
-		c = filters.InvertLuminosity(nrgba)
-	}
+	c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, runtime.GOMAXPROCS(0), 3)
+	// c = filters.InvertLuminosity(nrgba)
 	t2 := time.Now()
 	fmt.Println(t2.Sub(t1))
 
