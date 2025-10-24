@@ -8,7 +8,6 @@ import (
 	"image/png"
 	"os"
 	"reflect"
-	"runtime"
 	"time"
 
 	"github.com/IJJA3141/GoSCII/filters"
@@ -41,7 +40,7 @@ var in string
 var out string
 
 func init() {
-	createStringFlag(&in, "in", "./test_uwu.png", "path to the input image")
+	createStringFlag(&in, "in", "./example_images/test_uwu.png", "path to the input image")
 	createStringFlag(&out, "out", "out.png", "path to the output image")
 }
 
@@ -72,6 +71,19 @@ func toNrgba(_img image.Image) *image.NRGBA {
 	return out
 }
 
+func grayScale(_img image.Image) *image.Gray {
+	bounds := _img.Bounds()
+	img := image.NewGray(bounds)
+
+	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			img.Set(x, y, _img.At(x, y))
+		}
+	}
+
+	return img
+}
+
 func main() {
 	flag.Parse()
 
@@ -81,14 +93,29 @@ func main() {
 		return
 	}
 
-	nrgba := toNrgba(img)
-	var c *image.NRGBA
-
+	gray := grayScale(img)
 	t1 := time.Now()
-	c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, runtime.GOMAXPROCS(0), 3)
-	// c = filters.InvertLuminosity(nrgba)
+	_= filters.Sobel(gray)
 	t2 := time.Now()
+
+	t3 := time.Now()
+	sob2 := filters.Sobel2(gray)
+	t4 := time.Now()
+
 	fmt.Println(t2.Sub(t1))
+	fmt.Println(t4.Sub(t3))
+
+	c := filters.SobelToImg(sob2.ToSob())
+
+	// nrgba := toNrgba(img)
+	// var c *image.NRGBA
+	//
+	// t1 := time.Now()
+	// c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, runtime.GOMAXPROCS(0), 3)
+	// // c = filters.InvertLuminosity(nrgba)
+	// t2 := time.Now()
+	// fmt.Println(t2.Sub(t1))
+	//
 
 	outfile, _ := os.Create(out)
 	defer outfile.Close()

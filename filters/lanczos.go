@@ -1,8 +1,10 @@
 package filters
 
 import (
+	"fmt"
 	"image"
 	"math"
+	"runtime"
 	"sync"
 )
 
@@ -62,9 +64,17 @@ func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
 	tmp := image.NewNRGBA(image.Rect(0, 0, _width, _in.Rect.Dy()))
 
 	kern := coeffs(Δx, _a, _width)
+	for j := range _width {
+		for i := range 2 * _a {
+			fmt.Print(kern[j*_a*2+i], ", ")
+		}
+		fmt.Println()
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(_in.Rect.Dy())
+
+	runtime.GOMAXPROCS(0)
 
 	for y := range _in.Rect.Dy() {
 
@@ -112,6 +122,13 @@ func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
 
 	kern = coeffs(Δy, _a, _height)
 
+	for j := range _height {
+		for i := range 2 * _a {
+			fmt.Print(kern[j*_a*2+i], ", ")
+		}
+		fmt.Println()
+	}
+
 	wg.Add(_width)
 
 	for x := range _width {
@@ -157,5 +174,3 @@ func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
 
 	return out
 }
-
-
