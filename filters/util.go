@@ -1,30 +1,28 @@
 package filters
 
 import (
-	"image"
+	"runtime"
+	"sync"
 )
 
-func convolution(_img *image.Gray, _kern [][]float64) [][]float64 {
-	kernBounds := image.Rectangle{image.Pt(0, 0), image.Pt(len(_kern), len(_kern[0]))}
-	xOffset := len(_kern) / 2
-	yOffset := len(_kern[0]) / 2
-	bounds := _img.Bounds()
-	out := make([][]float64, bounds.Dx())
+type lambda func(_start, _end int)
 
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
+func Split(_Δ int, _fc lambda) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	var split int
 
-		out[x] = make([]float64, bounds.Dy())
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+	cpus := runtime.GOMAXPROCS(0)
+	wg.Add(cpus)
 
-			for i := kernBounds.Min.X; i < kernBounds.Max.X; i++ {
-				for j := kernBounds.Min.Y; j < kernBounds.Max.Y; j++ {
-					r, _, _, _ := _img.At(x-xOffset+i, y-yOffset+j).RGBA()
-					out[x][y] += float64(r) * _kern[i][j]
-				}
-			}
-
-		}
+	if cpus != 0 {
+		split = int(_Δ / (cpus - 1))
+	} else {
+		split = _Δ
 	}
 
-	return out
+	for cpu := range cpus {
+		go func() { defer wg.Done(); _fc(cpu*split, (cpu+1)*split) }()
+	}
+
+	return &wg
 }

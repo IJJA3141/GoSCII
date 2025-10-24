@@ -1,11 +1,8 @@
 package filters
 
 import (
-	"fmt"
 	"image"
 	"math"
-	"runtime"
-	"sync"
 )
 
 func l(_x float64, _a int) float64 {
@@ -37,74 +34,52 @@ func clamp(_x float64) uint8 {
 func coeffs(_λ float64, _a, _Δ int) []float64 {
 	kern := make([]float64, _Δ*2*_a)
 
-	for j := range _Δ {
-		x := (float64(j)+0.5)*_λ - 0.5
-		σ := 0.
+	Split(_Δ, func(_start, _end int) {
+		for j := _start; j < _end && j < _Δ; j++ {
+			x := (float64(j)+0.5)*_λ - 0.5
+			σ := 0.
 
-		for i := range 2 * _a {
-			xd := math.Floor(x) + float64(i) - (float64(_a) - 1.)
-			c := l(x-xd, _a)
-			σ += c
+			for i := range 2 * _a {
+				xd := math.Floor(x) + float64(i) - (float64(_a) - 1.)
+				c := l(x-xd, _a)
+				σ += c
 
-			kern[j*_a*2+i] = c
+				kern[j*_a*2+i] = c
+			}
+
+			for i := range 2 * _a {
+				kern[j*_a*2+i] /= σ
+			}
 		}
-
-		for i := range 2 * _a {
-			kern[j*_a*2+i] /= σ
-		}
-	}
+	}).Wait()
 
 	return kern
 }
 
-func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
-	Δx := float64(_in.Rect.Dx()) / float64(_width)
-	Δy := float64(_in.Rect.Dy()) / float64(_height)
-
+func Resize(_in *image.NRGBA, _width, _height, _a int) *image.NRGBA {
 	tmp := image.NewNRGBA(image.Rect(0, 0, _width, _in.Rect.Dy()))
-
+	Δx := float64(_in.Rect.Dx()) / float64(_width)
 	kern := coeffs(Δx, _a, _width)
-	for j := range _width {
-		for i := range 2 * _a {
-			fmt.Print(kern[j*_a*2+i], ", ")
-		}
-		fmt.Println()
-	}
 
-	var wg sync.WaitGroup
-	wg.Add(_in.Rect.Dy())
-
-	runtime.GOMAXPROCS(0)
-
-	for y := range _in.Rect.Dy() {
-
-		go func() {
-			defer wg.Done()
-
+	Split(_in.Rect.Dy(), func(_start, _end int) {
+		for y := _start; y < _end && y < _in.Rect.Dy(); y++ {
 			for j := range _width {
 
 				x := (float64(j)+0.5)*Δx - 0.5
-
 				var R, G, B, A float64
 
 				for a := range 2 * _a {
-					i := math.Floor(x) + float64(a) - (float64(_a) - 1.)
-					c := kern[j*_a*2+a]
+					xRel := int(math.Floor(x) + float64(a) - (float64(_a) - 1.))
+					xRel = max(0, xRel)
+					xRel = min(xRel, _in.Rect.Dx()-1)
 
-					ii := int(i)
+					index := y*_in.Stride + xRel*4
+					coeff := kern[j*_a*2+a]
 
-					if ii < 0 {
-						ii = 0
-					} else if _in.Rect.Dx() <= ii {
-						ii = _in.Rect.Dx() - 1
-					}
-
-					index := y*_in.Stride + ii*4
-
-					R += float64(_in.Pix[index]) * c
-					G += float64(_in.Pix[index+1]) * c
-					B += float64(_in.Pix[index+2]) * c
-					A += float64(_in.Pix[index+3]) * c
+					R += float64(_in.Pix[index]) * coeff
+					G += float64(_in.Pix[index+1]) * coeff
+					B += float64(_in.Pix[index+2]) * coeff
+					A += float64(_in.Pix[index+3]) * coeff
 				}
 
 				index := y*tmp.Stride + j*4
@@ -113,52 +88,32 @@ func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
 				tmp.Pix[index+2] = clamp(B)
 				tmp.Pix[index+3] = clamp(A)
 			}
-		}()
-	}
-
-	wg.Wait()
+		}
+	}).Wait()
 
 	out := image.NewNRGBA(image.Rect(0, 0, _width, _height))
-
+	Δy := float64(_in.Rect.Dy()) / float64(_height)
 	kern = coeffs(Δy, _a, _height)
 
-	for j := range _height {
-		for i := range 2 * _a {
-			fmt.Print(kern[j*_a*2+i], ", ")
-		}
-		fmt.Println()
-	}
-
-	wg.Add(_width)
-
-	for x := range _width {
-
-		go func() {
-			wg.Done()
-
+	Split(_width, func(_start, _end int) {
+		for x := _start; x < _end && x < _width; x++ {
 			for j := range _height {
-				y := (float64(j)+0.5)*Δy - 0.5
 
+				y := (float64(j)+0.5)*Δy - 0.5
 				var R, G, B, A float64
 
 				for a := range 2 * _a {
-					i := math.Floor(y) + float64(a) - (float64(_a) - 1.)
-					c := kern[j*_a*2+a]
+					i := int(math.Floor(y) + float64(a) - (float64(_a) - 1.))
+					i = max(0, i)
+					i = min(i, tmp.Rect.Dy()-1)
 
-					ii := int(i)
+					index := i*tmp.Stride + x*4
+					coeff := kern[j*_a*2+a]
 
-					if ii < 0 {
-						ii = 0
-					} else if tmp.Rect.Dy() <= ii {
-						ii = tmp.Rect.Dy() - 1
-					}
-
-					index := ii*tmp.Stride + x*4
-
-					R += float64(tmp.Pix[index]) * c
-					G += float64(tmp.Pix[index+1]) * c
-					B += float64(tmp.Pix[index+2]) * c
-					A += float64(tmp.Pix[index+3]) * c
+					R += float64(tmp.Pix[index]) * coeff
+					G += float64(tmp.Pix[index+1]) * coeff
+					B += float64(tmp.Pix[index+2]) * coeff
+					A += float64(tmp.Pix[index+3]) * coeff
 				}
 
 				index := j*tmp.Stride + x*4
@@ -167,10 +122,8 @@ func Resize(_in *image.NRGBA, _width, _height, _nWorkers, _a int) *image.NRGBA {
 				out.Pix[index+2] = clamp(B)
 				out.Pix[index+3] = clamp(A)
 			}
-		}()
-	}
-
-	wg.Wait()
+		}
+	}).Wait()
 
 	return out
 }

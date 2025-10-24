@@ -84,6 +84,38 @@ func grayScale(_img image.Image) *image.Gray {
 	return img
 }
 
+type lambda func()
+
+func benchmark(_name string, _fc lambda) {
+	start := time.Now()
+	for _ = range 10 {
+		_fc()
+	}
+	end := time.Now()
+
+	fmt.Println(_name, end.Sub(start)/10)
+}
+
+func runBenchmarks() {
+	img, _, _ := loadImage("./example_images/test_uwu.png")
+	nrgba := toNrgba(img)
+	benchmark("Lanczos uwu", func() {
+		_ = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 3)
+	})
+
+	img, _, _ = loadImage("./example_images/test_parrot.jpg")
+	nrgba = toNrgba(img)
+	benchmark("Lanczos parrot", func() {
+		_ = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 3)
+	})
+
+	img, _, _ = loadImage("./example_images/test_circle.jpg")
+	nrgba = toNrgba(img)
+	benchmark("Lanczos circle", func() {
+		_ = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 3)
+	})
+}
+
 func main() {
 	flag.Parse()
 
@@ -93,29 +125,23 @@ func main() {
 		return
 	}
 
-	gray := grayScale(img)
-	t1 := time.Now()
-	_= filters.Sobel(gray)
-	t2 := time.Now()
-
-	t3 := time.Now()
-	sob2 := filters.Sobel2(gray)
-	t4 := time.Now()
-
-	fmt.Println(t2.Sub(t1))
-	fmt.Println(t4.Sub(t3))
-
-	c := filters.SobelToImg(sob2.ToSob())
-
-	// nrgba := toNrgba(img)
-	// var c *image.NRGBA
-	//
+	// gray := grayScale(img)
 	// t1 := time.Now()
-	// c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, runtime.GOMAXPROCS(0), 3)
-	// // c = filters.InvertLuminosity(nrgba)
+	// sob := filters.Sobel(filters.In{Pix: gray.Pix, Height: gray.Rect.Dy(), Width: gray.Rect.Dx(), Stride: gray.Stride})
 	// t2 := time.Now()
+	//
 	// fmt.Println(t2.Sub(t1))
 	//
+	// c := filters.SobelToImg(sob.ToSob())
+
+	nrgba := toNrgba(img)
+	var c *image.NRGBA
+
+	t1 := time.Now()
+	c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 3)
+	// c = filters.InvertLuminosity(nrgba)
+	t2 := time.Now()
+	fmt.Println(t2.Sub(t1))
 
 	outfile, _ := os.Create(out)
 	defer outfile.Close()

@@ -1,49 +1,14 @@
 package filters
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"runtime"
-	"sync"
 )
 
 type Sob struct{ Gradiant, Angle float64 }
 
-func Sobel(_img *image.Gray) [][]Sob {
-	Gx := [][]float64{
-		{-1, 0, 1},
-		{-2, 0, 2},
-		{-1, 0, 1},
-	}
-
-	Gy := [][]float64{
-		{-1, -2, -1},
-		{0, 0, 0},
-		{1, 2, 1},
-	}
-
-	Mx := convolution(_img, Gx)
-	My := convolution(_img, Gy)
-
-	bounds := _img.Bounds()
-
-	out := make([][]Sob, bounds.Dx())
-
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
-
-		out[x] = make([]Sob, bounds.Dy())
-
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			out[x][y] = Sob{math.Sqrt(Mx[x][y]*Mx[x][y] + My[x][y]*My[x][y]), math.Atan2(My[x][y], Mx[x][y])}
-		}
-	}
-
-	return out
-}
-
-type NamingIsHard struct {
+type Out struct {
 	// Pairs holds the (gradiant, angle) pairs,
 	// The pair at (x, y) starts at Pairs[y*Stride + x*2].
 	Pairs []float64
@@ -52,70 +17,53 @@ type NamingIsHard struct {
 	Height, Width, Stride int
 }
 
-func Sobel2(_in *image.Gray) NamingIsHard {
-	Gx := [3 * 3]float64{
+func DetectEdges(_in image.Gray) Out {
+	out := Out{
+		Pairs:  make([]float64, _in.Rect.Dy()*2*_in.Rect.Dx()),
+		Height: _in.Rect.Dy(),
+		Width:  _in.Rect.Dx(),
+		Stride: _in.Rect.Dx() * 2,
+	}
+
+	Kern := [3 * 3]float64{
 		-1, 0, 1,
 		-2, 0, 2,
 		-1, 0, 1,
 	}
 
-	Gy := [3 * 3]float64{
-		-1, -2, -1,
-		0, 0, 0,
-		1, 2, 1,
-	}
+	Split(_in.Rect.Dy(), func(_start, _end int) {
+		for y := _start; y < _end && y < _in.Rect.Dy(); y++ {
+			for x := range _in.Rect.Dx() {
+				var sumX, sumY float64
 
-	out := NamingIsHard{
-		Stride: _in.Rect.Dx() * 2,
-		Pairs:  make([]float64, 2*_in.Rect.Dx()*_in.Rect.Dy()),
-		Height: _in.Rect.Dy(),
-		Width:  _in.Rect.Dx(),
-	}
+				for j := range 3 {
+					yIn := y - 1 + j
+					for i := range 3 {
+						xIn := x - 1 + i
 
-	var wg sync.WaitGroup
+						if 0 <= yIn && yIn < _in.Rect.Dy() && 0 <= xIn && xIn < _in.Rect.Dx() {
+							pix := float64(_in.Pix[yIn*_in.Stride+xIn])
 
-	cpus := runtime.GOMAXPROCS(0)
-	cpus = 1
-	wg.Add(cpus)
-
-	split := int(_in.Rect.Dy() / cpus)
-
-	for cpu := range cpus {
-		go func() {
-			defer wg.Done()
-
-			for y := cpu * split; y < (cpu+1)*split && y < _in.Rect.Dy(); y++ {
-				for x := range _in.Rect.Dx() {
-					var px, py float64
-
-					for j := range 3 {
-						yj := y - 1 + j
-
-						for i := range 3 {
-							xi := x - 1 + i
-
-							if 0 <= yj && yj < _in.Rect.Dy() && 0 <= xi && xi < _in.Rect.Dx() {
-								pix := float64(_in.Pix[yj*_in.Stride+xi])
-
-								px += pix * Gx[j * 3 + i]
-								py += pix * Gy[j * 3 + i]
-							}
+							sumX += pix * Kern[j*3+i]
+							sumY += pix * Kern[j+i*3]
 						}
 					}
-
-					out.Pairs[y*out.Stride+2*x] = math.Sqrt(px*px + py*py)
-					out.Pairs[y*out.Stride+2*x+1] = math.Atan2(py, px)
 				}
-			}
-		}()
-	}
 
-	wg.Wait()
+				out.Pairs[y*out.Stride+2*x] = math.Sqrt(sumX*sumX + sumY*sumY)
+				out.Pairs[y*out.Stride+2*x+1] = math.Atan2(sumY, sumX)
+			}
+		}
+	}).Wait()
 
 	return out
 }
 
-func (this *NamingIsHard) ToSob() [][]Sob {
+///------------------------------\
+//|SOULD BE REMOVED AT SOME POINT|
+//\------------------------------/
+
+func (this *Out) ToSob() [][]Sob {
 	out := make([][]Sob, this.Width)
 
 	for x := range this.Width {
@@ -170,10 +118,6 @@ func SobelToImg(_so [][]Sob) image.Image {
 					r, g, b = t, p, 1
 				case 5:
 					r, g, b = 1, p, q
-				}
-
-				if r > g && r > b {
-					fmt.Println(_so[x][y].Angle)
 				}
 
 				out.SetRGBA(x, y, color.RGBA{uint8(255 * r), uint8(255 * g), uint8(255 * b), a})
