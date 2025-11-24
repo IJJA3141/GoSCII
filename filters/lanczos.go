@@ -57,6 +57,8 @@ func coeffs(_λ float64, _a, _Δ int) []float64 {
 }
 
 func Resize(_in *image.NRGBA, _width, _height, _a int) *image.NRGBA {
+	assert(_a > 0)
+
 	tmp := image.NewNRGBA(image.Rect(0, 0, _width, _in.Rect.Dy()))
 	Δx := float64(_in.Rect.Dx()) / float64(_width)
 	kern := coeffs(Δx, _a, _width)

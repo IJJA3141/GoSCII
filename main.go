@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/IJJA3141/GoSCII/filters"
+	"github.com/fatih/color"
 )
 
 func getType(myvar any) string {
@@ -116,7 +117,106 @@ func runBenchmarks() {
 	})
 }
 
+func printCol(ascii filters.AsciiImage, colors image.NRGBA) {
+	for y := range ascii.Height {
+		for x := range ascii.Width {
+			r := int(colors.Pix[y*colors.Stride+x*4])
+			g := int(colors.Pix[y*colors.Stride+x*4+1])
+			b := int(colors.Pix[y*colors.Stride+x*4+2])
+			color.RGB(r, g, b).Print(ascii.Runes[y*ascii.Width+x])
+		}
+		fmt.Println()
+	}
+}
+
+func test_ascii(test [16]uint16) {
+	var (
+		offset     uint16 = 0
+		y                 = 0
+		x                 = 0
+		_threshold uint16 = 1
+	)
+
+	_in := struct {
+		Pix    [16]uint16
+		Stride int
+	}{
+		Pix:    test,
+		Stride: 4,
+	}
+
+	// [OO]
+	// [OO]
+	// [OO]
+	// [XX] <-
+	// offset <<= 1
+	if _in.Pix[(y+3)*_in.Stride+(x+1)] < _threshold {
+		offset += 1
+	}
+
+	offset <<= 1
+	if _in.Pix[(y+3)*_in.Stride+(x)] < _threshold {
+		offset += 1
+	}
+
+	// [OX]
+	// [OX] ^
+	// [OX] |
+	// [OO]
+	offset <<= 1
+	if _in.Pix[(y+2)*_in.Stride+(x+1)] < _threshold {
+		offset += 1
+	}
+
+	offset <<= 1
+	if _in.Pix[(y+1)*_in.Stride+(x+1)] < _threshold {
+		offset += 1
+	}
+
+	offset <<= 1
+	if _in.Pix[(y)*_in.Stride+(x+1)] < _threshold {
+		offset += 1
+	}
+
+	// [XO]
+	// [XO] ^
+	// [XO] |
+	// [OO]
+	offset <<= 1
+	if _in.Pix[(y+2)*_in.Stride+(x)] < _threshold {
+		offset += 1
+	}
+
+	offset <<= 1
+	if _in.Pix[(y+1)*_in.Stride+(x)] < _threshold {
+		offset += 1
+	}
+
+	offset <<= 1
+	if _in.Pix[(y)*_in.Stride+(x)] < _threshold {
+		offset += 1
+	}
+
+	fmt.Printf("%c\n", rune(0x2800+offset))
+
+}
+
 func main() {
+	// test_ascii([16]uint16{0, 0, 0, 0,
+	// 	0, 0, 0, 0,
+	// 	0, 0, 0, 0,
+	// 	0, 0, 0, 0})
+	//
+	// test_ascii([16]uint16{1, 1, 0, 0,
+	// 	1, 1, 0, 0,
+	// 	1, 1, 0, 0,
+	// 	1, 1, 0, 0})
+	//
+	// test_ascii([16]uint16{0, 1, 0, 0,
+	// 	1, 0, 0, 0,
+	// 	0, 1, 0, 0,
+	// 	1, 0, 0, 0})
+
 	flag.Parse()
 
 	img, _, err := loadImage(in)
@@ -137,13 +237,31 @@ func main() {
 	nrgba := toNrgba(img)
 	var c *image.NRGBA
 
+	width := 200
+	height := int(float64(width) / 2)
+
 	t1 := time.Now()
-	c = filters.Resize(nrgba, nrgba.Rect.Dx()*10, nrgba.Rect.Dy()*10, 3)
+	// c = filters.Resize(nrgba, nrgba.Rect.Dx()/3, nrgba.Rect.Dy()/6, 3)
+	c = filters.Resize(nrgba, width, height, 3)
 	// c = filters.InvertLuminosity(nrgba)
 	t2 := time.Now()
 	fmt.Println(t2.Sub(t1))
 
+	// runes := []string{" ", ".", "'", "`", "^", "\"", ",", ":", ";", "I", "l", "!", "i", ">", "<", "~", "+", "_", "-", "?", "]", "[", "}", "{", "1", ")", "(", "|", "\\", "/", "t", "f", "j", "r", "x", "n", "u", "v", "c", "z", "X", "Y", "U", "J", "C", "L", "Q", "0", "O", "Z", "m", "w", "q", "p", "d", "b", "k", "h", "a", "o", "*", "#", "M", "W", "&", "8", "%", "B", "@", "$"}
+	// ascii := filters.Ascii(*grayScale(c), runes)
+	ascii := filters.Braille(*grayScale(c), 155)
+
+	for y := range ascii.Height {
+		for x := range ascii.Width {
+			fmt.Printf("%c", ascii.Runes[y*ascii.Width+x])
+		}
+		fmt.Println()
+	}
+
+	// printCol(ascii, *c)
+
 	outfile, _ := os.Create(out)
 	defer outfile.Close()
+	// png.Encode(outfile, grayScale(c))
 	png.Encode(outfile, c)
 }

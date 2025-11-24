@@ -6,8 +6,6 @@ import (
 	"math"
 )
 
-type Sob struct{ Gradiant, Angle float64 }
-
 type Out struct {
 	// Pairs holds the (gradiant, angle) pairs,
 	// The pair at (x, y) starts at Pairs[y*Stride + x*2].
@@ -62,6 +60,8 @@ func DetectEdges(_in image.Gray) Out {
 ///------------------------------\
 //|SOULD BE REMOVED AT SOME POINT|
 //\------------------------------/
+
+type Sob struct{ Gradiant, Angle float64 }
 
 func (this *Out) ToSob() [][]Sob {
 	out := make([][]Sob, this.Width)

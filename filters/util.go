@@ -26,3 +26,9 @@ func Split(_Δ int, _fc lambda) *sync.WaitGroup {
 
 	return &wg
 }
+
+func assert(condition bool) {
+	if !condition {
+		panic(1)
+	}
+}
