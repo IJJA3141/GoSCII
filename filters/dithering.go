@@ -59,7 +59,7 @@ func m(n int) [][]uint8 {
 //   - An error if the bit depth n is less than 1
 //
 // The computation is parallelized across rows for improved performance.
-func BayerDithering(img *GrayScalePlane, n int) (*GrayScalePlane, error) {
+func (img *GrayScalePlane) BayerDithering(n int) (*GrayScalePlane, error) {
 	if n < 1 {
 		return nil, errors.New("BayerDithering: n must be >= 1")
 	}

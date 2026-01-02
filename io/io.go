@@ -1,7 +1,6 @@
 package io
 
 import (
-	"fmt"
 	"image"
 	_ "image/jpeg"
 	"image/png"
@@ -71,28 +70,4 @@ func Write(_path string, _img *filters.RGBAPlane) error {
 	)
 
 	return nil
-}
-
-func Stamp(_img *filters.AsciiPlane) {
-	fmt.Println("image:")
-
-	for y := range _img.Height {
-		for x := range _img.Width {
-			fmt.Printf("%c", _img.Chars[y*_img.Stride+x])
-		}
-
-		fmt.Println()
-	}
-}
-
-func StampC(_img *filters.AsciiColorPlane) {
-	fmt.Println("image:")
-
-	for y := range _img.Height {
-		for x := range _img.Width {
-			fmt.Printf("%s", _img.Chars[y*_img.Stride+x])
-		}
-
-		fmt.Println()
-	}
 }

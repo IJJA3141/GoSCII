@@ -6,6 +6,7 @@ import (
 	_ "image/jpeg"
 
 	"github.com/IJJA3141/GoSCII/io"
+	"github.com/IJJA3141/GoSCII/tui"
 )
 
 var in string
@@ -25,11 +26,11 @@ func main() {
 		return
 	}
 
-	outWidth := 80
-	outHeight := int(80/3)
+	// outWidth := 80
+	// // outHeight := int(80/3)
 	// outHeight := float64(img.Height) / float64(img.Width) * float64(outWidth)
 
-	img, err = img.LanczosResize(outWidth*2, int(outHeight*4), 3)
+	img, err = img.LanczosResize(img.Width, img.Height/2, 3)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -37,39 +38,40 @@ func main() {
 
 	gray := img.ToGrayScale()
 
-	// gray, err = filters.BayerDithering(gray, 1)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
-	// img, err = img.LanczosResize(outWidth, int(outHeight), 3)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
-	// ascii := filters.Braille(gray, 1)
-	// ascii := gray.Ascii([]rune(
-	// 	" .:,`';^-_!~\"</>*+?\\v)x=cJY|Lil{}7T(1CetzVXnorsaujyUfI]23AFHZ5S[K#%4hw6&KOp9PbGmdq$08DERNQgMWB@",
-	// ))
-	edge := gray.SobelEdgeDetection()
-	ascii := edge.Ascii(750, []rune(
-		// "→↗↑↖←↙↓↘",
-		// "↖↖",
-		// "123455678",
-		// "←↖↑↗→↘↓↙←",
-		"|/-\\|/-\\|",
-	))
-
-	color, err := ascii.Colorize(edge.ToRGBA(750))
+	gray, err = gray.BayerDithering(1)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	io.StampC(color)
-	err = io.Write(out, edge.ToRGBA(750))
+	img, err = img.LanczosResize(img.Width/2, img.Height/4, 3)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	ascii := gray.Braille(1)
+	// ascii := gray.Ascii([]rune(
+	// 	" .:,`';^-_!~\"</>*+?\\v)x=cJY|Lil{}7T(1CetzVXnorsaujyUfI]23AFHZ5S[K#%4hw6&KOp9PbGmdq$08DERNQgMWB@",
+	// ))
+	// edge := gray.SobelEdgeDetection()
+	// ascii := edge.Ascii(750, []rune(
+	// 	// "→↗↑↖←↙↓↘",
+	// 	// "↖↖",
+	// 	// "123455678",
+	// 	// "←↖↑↗→↘↓↙←",
+	// 	"|/-\\|/-\\|",
+	// ))
+
+	color, err := ascii.Colorize(img)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	tui.Start(color)
+
+	err = io.Write(out, gray.ToRGBA())
 	if err != nil {
 		fmt.Println(err)
 		return

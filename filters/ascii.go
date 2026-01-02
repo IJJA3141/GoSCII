@@ -1,10 +1,15 @@
 package filters
 
 import (
-	"errors"
+	_ "errors"
+	"fmt"
 	"math"
 	"strconv"
 )
+
+type Stampable interface {
+	Stamp() (int, int, [][]string)
+}
 
 // Colorize converts an AsciiPlane into an AsciiColorPlane using an RGBAPlane
 // as the source of color information.
@@ -25,7 +30,8 @@ import (
 //   - An error if the dimensions of the ASCII plane and colors plane differ
 func (ascii *AsciiPlane) Colorize(colors *RGBAPlane) (*AsciiColorPlane, error) {
 	if ascii.Height != colors.Height || ascii.Width != colors.Width {
-		return nil, errors.New("Colorize: dimensions of ASCII plane and color plane do not match")
+		// return nil, errors.New("Colorize: dimensions of ASCII plane and color plane do not match")
+		return nil, fmt.Errorf("Colorize: dimensions of ASCII plane and color plane do not match\nascii.Height %d != colors.Height %d\nascii.Width %d != colors.Width %d", ascii.Height, colors.Height, ascii.Width, colors.Width)
 	}
 
 	out := NewAsciiColorPlane(ascii.Width, ascii.Height)
@@ -170,3 +176,27 @@ func (img *GrayScalePlane) Braille(threshold float64) *AsciiPlane {
 // func CarveEdges(_img *AsciiPlane, _edges *EdgePlane, _palette []rune) *AsciiPlane {
 // 	return &AsciiPlane{}
 // }
+
+func (img *AsciiPlane) Stamp() (int, int, [][]string) {
+	out := make([][]string, img.Height)
+
+	for y := range img.Height {
+		out[y] = make([]string, img.Width)
+
+		for x := range img.Width {
+			out[y][x] = string(img.Chars[y*img.Stride+x])
+		}
+	}
+
+	return img.Width, img.Height, out
+}
+
+func (img *AsciiColorPlane) Stamp() (int, int, [][]string) {
+	out := make([][]string, img.Height)
+
+	for y := range img.Height {
+		out[y] = img.Chars[y*img.Stride : y*img.Stride+img.Width]
+	}
+
+	return img.Width, img.Height, out
+}
