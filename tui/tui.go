@@ -9,7 +9,8 @@ import (
 )
 
 type model struct {
-	frame Frame
+	frame  Frame
+	buffer []string
 }
 
 func (m model) Init() tea.Cmd {
@@ -40,13 +41,16 @@ func (m model) View() string {
 }
 
 func Start(tmp filters.Stampable) {
-	p := tea.NewProgram(model{Frame{
-		img:    tmp,
-		width:  0,
-		height: 0,
-		x:      0,
-		y:      0,
-	}}, tea.WithAltScreen())
+	p := tea.NewProgram(model{
+		frame: Frame{
+			img:    tmp,
+			width:  0,
+			height: 0,
+			x:      0,
+			y:      0,
+		},
+		buffer: make([]string, 1),
+	}, tea.WithAltScreen())
 
 	tea.WindowSize()
 

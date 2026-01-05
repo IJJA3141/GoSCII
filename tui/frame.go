@@ -8,10 +8,27 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+const speed = 2
+
 type Frame struct {
 	img           filters.Stampable
 	width, height int
 	x, y          int
+	buffer        []string
+	xCrop, yCrop  bool
+}
+
+func NewFrame(width, height int) Frame {
+	return Frame{
+		img:    nil,
+		width:  width,
+		height: height,
+		x:      0,
+		y:      0,
+		buffer: make([]string, width*height),
+		xCrop:  false,
+		yCrop:  false,
+	}
 }
 
 func (frame *Frame) SetImage(img filters.Stampable) {
@@ -25,6 +42,8 @@ func (frame *Frame) Resize(width, height int) {
 	frame.height = height
 	frame.x = 0
 	frame.y = 0
+	frame.xCrop = width > frame.width
+	frame.yCrop = height > frame.height
 }
 
 func (frame *Frame) Update(msg tea.Msg) {
@@ -34,7 +53,7 @@ func (frame *Frame) Update(msg tea.Msg) {
 		switch msg.String() {
 
 		case tea.KeyLeft.String(), "h":
-			frame.x = max(0, frame.x-1)
+			frame.x = max(0, frame.x-1*speed)
 			return
 
 		case tea.KeyRight.String(), "l":
@@ -45,7 +64,7 @@ func (frame *Frame) Update(msg tea.Msg) {
 				return
 			}
 
-			frame.x = min(width-frame.width, frame.x+1)
+			frame.x = min(width-frame.width, frame.x+1*speed)
 			return
 
 		case tea.KeyUp.String(), "k":
@@ -60,7 +79,7 @@ func (frame *Frame) Update(msg tea.Msg) {
 				return
 			}
 
-			frame.y = min(height-frame.height, frame.y+1)
+			frame.y = min(height-frame.height, frame.y+1*speed)
 			return
 		}
 	}
@@ -76,11 +95,11 @@ func (frame *Frame) View() []string {
 	emptyLine := strings.Repeat(" ", frame.width)
 
 	if yCrop {
-		start := (height - frame.height) / 2
+		start := (height - frame.height + frame.y) / 2
 
 		for j := range out {
 			if xCrop {
-				x := (width - frame.width) / 2
+				x := (width - frame.width + frame.x) / 2
 				out[j] = strings.Join(stamp[j+start][x:x+frame.width], "")
 			} else {
 				diff := float64(frame.width-width) / 2.
