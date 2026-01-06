@@ -69,6 +69,8 @@ func main() {
 		return
 	}
 
+	// fmt.Println(color.Buffer())
+
 	tui.Start(color)
 
 	err = io.Write(out, gray.ToRGBA())

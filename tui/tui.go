@@ -9,8 +9,7 @@ import (
 )
 
 type model struct {
-	frame  Frame
-	buffer []string
+	frame frame
 }
 
 func (m model) Init() tea.Cmd {
@@ -40,16 +39,9 @@ func (m model) View() string {
 	return strings.Join(m.frame.View(), "\n")
 }
 
-func Start(tmp filters.Stampable) {
+func Start(tmp filters.Ascii) {
 	p := tea.NewProgram(model{
-		frame: Frame{
-			img:    tmp,
-			width:  0,
-			height: 0,
-			x:      0,
-			y:      0,
-		},
-		buffer: make([]string, 1),
+		frame: Frame(0, 0, tmp),
 	}, tea.WithAltScreen())
 
 	tea.WindowSize()

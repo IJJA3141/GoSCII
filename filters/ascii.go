@@ -5,10 +5,19 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 )
 
 type Stampable interface {
-	Stamp() (int, int, [][]string)
+	Width_() int
+	Height_() int
+	Buffer() []string
+}
+
+type Ascii interface {
+	Get(x, y, width, height int) []string
+	Width_() int
+	Height_() int
 }
 
 // Colorize converts an AsciiPlane into an AsciiColorPlane using an RGBAPlane
@@ -37,7 +46,7 @@ func (ascii *AsciiPlane) Colorize(colors *RGBAPlane) (*AsciiColorPlane, error) {
 	out := NewAsciiColorPlane(ascii.Width, ascii.Height)
 
 	split(out.Height, func(_start, _end int) {
-		var prevR, prevG, prevB uint8 = uint8(colors.RGBA[_start*colors.Stride]) - 1, 0, 0
+		// var prevR, prevG, prevB uint8 = uint8(colors.RGBA[_start*colors.Stride]) - 1, 0, 0
 
 		for y := _start; y < _end && y < out.Height; y++ {
 			for x := range out.Width {
@@ -47,18 +56,18 @@ func (ascii *AsciiPlane) Colorize(colors *RGBAPlane) (*AsciiColorPlane, error) {
 				b := uint8(colors.RGBA[index+2])
 				// a:=uint8(_colors.RGBA[index+3]) // might take the alpha in consideration
 
-				if r == prevR && g == prevG && b == prevB {
-					out.Chars[y*out.Stride+x] = string(ascii.Chars[y*ascii.Stride+x])
-				} else {
-					out.Chars[y*out.Stride+x] =
-						"\x1B[38;2;" + strconv.FormatUint(uint64(r), 10) +
-							";" + strconv.FormatUint(uint64(g), 10) +
-							";" + strconv.FormatUint(uint64(b), 10) + "m" + string(ascii.Chars[y*ascii.Stride+x])
+				// if r == prevR && g == prevG && b == prevB {
+				// 	out.Chars[y*out.Stride+x] = string(ascii.Chars[y*ascii.Stride+x])
+				// } else {
+				out.Chars[y*out.Stride+x] =
+					"\x1B[38;2;" + strconv.FormatUint(uint64(r), 10) +
+						";" + strconv.FormatUint(uint64(g), 10) +
+						";" + strconv.FormatUint(uint64(b), 10) + "m" + string(ascii.Chars[y*ascii.Stride+x])
 
-					prevR = r
-					prevG = g
-					prevB = b
-				}
+				// prevR = r
+				// prevG = g
+				// prevB = b
+				// }
 			}
 		}
 	}).Wait()
@@ -177,18 +186,18 @@ func (img *GrayScalePlane) Braille(threshold float64) *AsciiPlane {
 // 	return &AsciiPlane{}
 // }
 
-func (img *AsciiPlane) Stamp() (int, int, [][]string) {
-	out := make([][]string, img.Height)
+func (this *AsciiPlane) Width_() int  { return this.Width }
+func (this *AsciiPlane) Height_() int { return this.Height }
+func (this *AsciiPlane) Buffer() []string {
+	out := make([]string, this.Height)
 
-	for y := range img.Height {
-		out[y] = make([]string, img.Width)
-
-		for x := range img.Width {
-			out[y][x] = string(img.Chars[y*img.Stride+x])
+	split(this.Height, func(_start, _end int) {
+		for y := _start; y < _end && y < this.Height; y++ {
+			out[y] = string(this.Chars[y*this.Stride : y*this.Stride+this.Width])
 		}
-	}
+	}).Wait()
 
-	return img.Width, img.Height, out
+	return out
 }
 
 func (img *AsciiColorPlane) Stamp() (int, int, [][]string) {
@@ -199,4 +208,40 @@ func (img *AsciiColorPlane) Stamp() (int, int, [][]string) {
 	}
 
 	return img.Width, img.Height, out
+}
+
+func (this *AsciiColorPlane) Width_() int  { return this.Width }
+func (this *AsciiColorPlane) Height_() int { return this.Height }
+func (this *AsciiColorPlane) Buffer() []string {
+	out := make([]string, this.Height)
+
+	split(this.Height, func(_start, _end int) {
+		for y := _start; y < _end && y < this.Height; y++ {
+			out[y] = strings.Join(this.Chars[y*this.Stride:y*this.Stride+this.Width], "")
+		}
+	}).Wait()
+
+	return out
+}
+
+func (this *AsciiPlane) Get(x, y, width, height int) []string {
+	out := make([]string, height)
+
+	for i := range height {
+		index := (y+i)*this.Stride + x
+		out[i] = string(this.Chars[index : index+width])
+	}
+
+	return out
+}
+
+func (this *AsciiColorPlane) Get(x, y, width, height int) []string {
+	out := make([]string, height)
+
+	for i := range height {
+		index := (y+i)*this.Stride + x
+		out[i] = strings.Join((this.Chars[index : index+width]), "")
+	}
+
+	return out
 }
