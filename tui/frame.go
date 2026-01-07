@@ -70,10 +70,32 @@ func (this *frame) Update(msg tea.KeyMsg) {
 	case "j", tea.KeyDown.String():
 		height := this.src.Height_()
 		if height > this.height { // case 0|1
-			this.y = min(this.y+1, height-this.width)
+			this.y = min(this.y+1, height-this.height)
 		}
 
-		this.hasChanged = true
+	case "H":
+		width := this.src.Width_()
+		if width > this.width { // case 0|2
+			this.x = max(0, this.x-5)
+		}
+
+	case "L", tea.KeyRight.String():
+		width := this.src.Width_()
+		if width > this.width { // case 0|2
+			this.x = min(this.x+5, width-this.width)
+		}
+
+	case "K", tea.KeyUp.String():
+		height := this.src.Height_()
+		if height > this.height { // case 0|1
+			this.y = max(0, this.y-5)
+		}
+
+	case "J", tea.KeyDown.String():
+		height := this.src.Height_()
+		if height > this.height { // case 0|1
+			this.y = min(this.y+5, height-this.height)
+		}
 	}
 }
 

@@ -167,7 +167,7 @@ func (img *GrayScalePlane) Braille(threshold float64) *AsciiPlane {
 
 				for j := range 4 {
 					for i := range 2 {
-						if img.Shades[(y*4+j)*img.Stride+(x*2+i)] > threshold {
+						if img.Shades[(y*4+j)*img.Stride+(x*2+i)] >= threshold {
 							char += dotMatrix[j][i]
 						}
 					}

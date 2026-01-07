@@ -30,15 +30,15 @@ func main() {
 	// // outHeight := int(80/3)
 	// outHeight := float64(img.Height) / float64(img.Width) * float64(outWidth)
 
-	img, err = img.LanczosResize(img.Width, img.Height/2, 3)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	// img, err = img.LanczosResize(img.Width, img.Height/2, 3)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
 	gray := img.ToGrayScale()
 
-	gray, err = gray.BayerDithering(1)
+	gray, err = gray.BayerDithering(8)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -50,7 +50,7 @@ func main() {
 		return
 	}
 
-	ascii := gray.Braille(1)
+	ascii := gray.Braille(200)
 	// ascii := gray.Ascii([]rune(
 	// 	" .:,`';^-_!~\"</>*+?\\v)x=cJY|Lil{}7T(1CetzVXnorsaujyUfI]23AFHZ5S[K#%4hw6&KOp9PbGmdq$08DERNQgMWB@",
 	// ))
