@@ -2,47 +2,42 @@ package tui
 
 import (
 	"errors"
-	"io"
 	"os"
 	"syscall"
 
 	"github.com/charmbracelet/x/term"
 )
 
-const (
-	FFRM = iota
-	FBAR
-	FCMD
-)
+const bar_width = 30
+const min_width = 100
+const min_height = 30
 
 type state struct {
-	running    bool
+	running  bool
+	drawable bool
+
 	eventQueue chan event
-	prevTerm   *term.State
-	tty        *os.File
+
+	prevTerm *term.State
 
 	width, height int
-	redraw        bool
 
-	focusIndex int
+	input  *os.File
+	output *os.File
 
-	frame   Frame
-	bar     Bar
-	command Command
+	frame Frame
+	bar   Bar
 }
 
 var (
-	ErrNotTerm = errors.New("")
+	ErrNotTerm = errors.New("output wasn't a terminal")
 )
 
-func (this *Frame) HandleKey(key string) bool
-func (this *Bar) HandleKey(key string) bool
-func (this *Command) HandleKey(key string) bool
-
-func StartTui(path string, input *os.File, output io.Writer) error {
+func StartTui(image_path string, input *os.File, output *os.File) error {
 	var err error
 
-	state := NewState(path, input, output)
+	state := state{input: input, output: output, eventQueue: make(chan event)}
+
 	err = state.Initialize()
 	if err != nil {
 		return err
@@ -60,72 +55,63 @@ func StartTui(path string, input *os.File, output io.Writer) error {
 			err = state.HandleError(event)
 
 		case string:
-			var handledl bool
-
-			switch state.focusIndex {
-			case FFRM:
-				handledl = state.frame.HandleKey(event)
-
-			case FBAR:
-				handledl = state.bar.HandleKey(event)
-
-			case FCMD:
-				handledl = state.command.HandleKey(event)
-			}
-
-			if !handledl {
-				state.HandleKey(event)
-			}
+			state.HandleKey(event)
 		}
 	}
 
-	return errors.Join(err, state.Close(input))
-}
-
-func NewState(imgPath string, in io.Reader, out io.Writer) state {
-	return state{}
+	return errors.Join(err, state.Close())
 }
 
 func (this *state) Initialize() error {
-	if !term.IsTerminal(this.tty.Fd()) {
+	if !term.IsTerminal(this.output.Fd()) {
 		return ErrNotTerm
 	}
 
 	var err error
-	this.prevTerm, err = term.MakeRaw(this.tty.Fd())
+	this.prevTerm, err = term.MakeRaw(this.input.Fd())
+	if err != nil {
+		return err
+	}
+
+	this.width, this.height, err = term.GetSize(this.input.Fd())
 	if err != nil {
 		return err
 	}
 
 	SignalListener(this.eventQueue, syscall.SIGWINCH)
-	err = KeyboardListener(this.eventQueue, this.tty)
+	err = KeyboardListener(this.eventQueue, this.input)
 	if err != nil {
 		return err
 	}
 
-	this.running = true
+	this.output.Write([]byte("\x1b[2J\x1b[H"))
 
+	this.running = true
 	return nil
 }
 
-func (this *state) Close(input *os.File) error {
+func (this *state) Close() error {
 	var err error
 
 	if this.prevTerm != nil {
-		err = term.Restore(input.Fd(), this.prevTerm)
+		err = term.Restore(this.output.Fd(), this.prevTerm)
 	}
 
 	return err
 }
 
+func (frame *Frame) resize(width, height int) {}
+func (bar *Bar) resize(width, height int)     {}
+
 func (this *state) HandleSignal(sig syscall.Signal) error {
 	switch sig {
 	case syscall.SIGINT, syscall.SIGTERM:
+		this.output.Write([]byte("!"))
 		this.running = false
 
 	case syscall.SIGWINCH:
 		var err error
-		this.width, this.height, err = term.GetSize(this.tty.Fd())
+		this.width, this.height, err = term.GetSize(this.input.Fd())
 		if err != nil {
 
 			// might change
@@ -134,7 +120,11 @@ func (this *state) HandleSignal(sig syscall.Signal) error {
 			return err
 		}
 
-		this.redraw = true
+		this.drawable = this.width >= min_height && this.height >= min_height
+		if this.drawable {
+			this.frame.resize(this.width-bar_width, this.height)
+			this.bar.resize(bar_width, this.height)
+		}
 	}
 
 	return nil
@@ -146,15 +136,21 @@ func (this *state) HandleError(err error) error {
 }
 
 func (this *state) HandleKey(key string) {
-	switch key {
-	case "q":
-		this.running = false
+	print("new key")
 
-	case "tab":
-		this.focusIndex = min(this.focusIndex + 1)
+	if key == "q" {
+		this.running = false
 	}
+
+	this.bar.HandleKey(key) // for now
 }
 
 func (this *state) Draw() {
+	// clear canvas
 
+	// draw child
+
+	// set cursor
+
+	this.output.Write([]byte("Hello world!\n" + this.bar.Draw(5, 5)))
 }

@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"fmt"
+	// "fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -32,19 +32,19 @@ func KeyboardListener(out chan event, source io.Reader) error {
 
 			if size != BUFFER_SIZE {
 				//  TODO rm this   //
-				fmt.Print(buf[:size])
-				fmt.Print("\t")
+				// fmt.Print(buf[:size])
+				// fmt.Print("\t")
 				// --------------- //
  				out <- string(buf[:size]) 
 				continue
 			}
 
-			// if theyre is more thant wah t vould be red 
+			// if theyre is more thant waht could be read 
 			// loop until all is raed
 			var acc []byte = make([]byte, 0, BUFFER_SIZE*2) // rare path
 			copy(acc, buf[:])
 
-			for size == 8 {
+			for size == BUFFER_SIZE {
 				size, err = reader.Read(buf[:])
 				if err != nil { out <- err }
 				acc = append(acc, buf[:size]...)

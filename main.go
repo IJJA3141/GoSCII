@@ -1,81 +1,150 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	_ "image/jpeg"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 
-	"github.com/IJJA3141/GoSCII/io"
-	"github.com/IJJA3141/GoSCII/tui"
+	// "github.com/IJJA3141/GoSCII/tui"
+	"github.com/charmbracelet/x/term"
+	"github.com/muesli/cancelreader" // We may want to move away from this: using epoll instead of poll is suboptimal.
 )
 
-var in string
-var out string
+// func main() {
+// 	file := os.Stdin
+//
+// 	// s, _ := term.MakeRaw(file.Fd())
+//
+// 	err := tui.StartTui("", file, file)
+// 	if err != nil {
+// 		fmt.Print("err::")
+// 		fmt.Println(err)
+// 	}
+//
+// 	// term.Restore(file.Fd(), s)
+// }
 
-func init() {
-	io.CreateStringFlag(&in, "in", "./example_images/test_uwu.png", "path to the input image")
-	io.CreateStringFlag(&out, "out", "out.png", "path to the output image")
+type event any
+
+type resizeEvent struct {
+	width, height int
+}
+
+type kbdEvent struct {
+	key string
+}
+
+func start1(out chan event) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGWINCH)
+
+	go func() {
+		for {
+			<-c
+			width, height, err := term.GetSize(os.Stdin.Fd())
+			if err != nil {
+			}
+
+			out <- resizeEvent{width, height}
+		}
+	}()
+}
+
+func start2(out chan event) {
+	file := os.Stdin
+	r, err := cancelreader.NewReader(file)
+	if err != nil {
+	}
+
+	go func() {
+		for {
+			var buf [1024]byte
+			n, err := r.Read(buf[:])
+			if err != nil {
+			}
+
+			out <- kbdEvent{string(buf[:n])}
+			// t := binary.LittleEndian.Uint16(buf[:])
+			// fmt.Print(t)
+			// fmt.Print("\t")
+			// if t == 768 ||
+			// 	buf[0] == 'q' {
+			// 	break
+			// }
+		}
+	}()
 }
 
 func main() {
-	flag.Parse()
+	file := os.Stdin
 
-	img, err := io.Read(in)
-	if err != nil {
-		fmt.Println(err)
-		return
+	s, _ := term.MakeRaw(file.Fd())
+
+	width, height, _ := term.GetSize(os.Stdin.Fd())
+
+	print("\x1b[2J\x1b[H")
+
+	str := strings.Repeat("A", width) + "\r\n"
+	for range height {
+		print(str)
 	}
 
-	// outWidth := 80
-	// // outHeight := int(80/3)
-	// outHeight := float64(img.Height) / float64(img.Width) * float64(outWidth)
+	// go func() {
+	// 	time.Sleep(50000)
+	// 	str := strings.Repeat(" ", 15)
+	// 	for i := range 5 {
+	// 		print("\x1b["+fmt.Sprint(i+5)+";10H", str)
+	// 	}
+	// }()
+	// go func() {
+	// 	str := strings.Repeat("-", 15)
+	// 	for i := range 10 {
+	// 		print("\x1b["+fmt.Sprint(i+5)+";15H", str)
+	// 	}
+	// }()
 
-	// img, err = img.LanczosResize(img.Width, img.Height/2, 3)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
+	event_channel := make(chan event, 1)
 
-	gray := img.ToGrayScale()
+	// term events
+	start1(event_channel)
 
-	gray, err = gray.BayerDithering(8)
-	if err != nil {
-		fmt.Println(err)
-		return
+	// user events
+	start2(event_channel)
+
+	var u = 5
+	var o = 15
+
+exit:
+	for {
+		// wait event
+		// update with event
+		// new render
+
+		switch event := (<-event_channel).(type) {
+		case resizeEvent:
+			fmt.Printf("%dx%d", event.width, event.height)
+
+		case kbdEvent:
+			if event.key == "q" {
+				break exit
+			} else if event.key == "n" {
+				str := strings.Repeat(" ", 15)
+				for i := range 10 {
+					print("\x1b["+fmt.Sprint(i+u)+";"+fmt.Sprint(o)+"H", str)
+				}
+				u += 20
+				if u > height {
+					u = 0
+					o += 20
+				}
+			} else {
+				print([]byte(event.key))
+				print("\t")
+			}
+		}
 	}
 
-	img, err = img.LanczosResize(img.Width/2, img.Height/4, 3)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	ascii := gray.Braille(200)
-	// ascii := gray.Ascii([]rune(
-	// 	" .:,`';^-_!~\"</>*+?\\v)x=cJY|Lil{}7T(1CetzVXnorsaujyUfI]23AFHZ5S[K#%4hw6&KOp9PbGmdq$08DERNQgMWB@",
-	// ))
-	// edge := gray.SobelEdgeDetection()
-	// ascii := edge.Ascii(750, []rune(
-	// 	// "→↗↑↖←↙↓↘",
-	// 	// "↖↖",
-	// 	// "123455678",
-	// 	// "←↖↑↗→↘↓↙←",
-	// 	"|/-\\|/-\\|",
-	// ))
-
-	color, err := ascii.Colorize(img)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// fmt.Println(color.Buffer())
-
-	tui.Start(color)
-
-	err = io.Write(out, gray.ToRGBA())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	term.Restore(file.Fd(), s)
 }
