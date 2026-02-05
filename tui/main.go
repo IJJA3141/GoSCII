@@ -3,154 +3,145 @@ package tui
 import (
 	"errors"
 	"os"
+	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/charmbracelet/x/term"
+	"github.com/muesli/cancelreader"
 )
 
 const bar_width = 30
 const min_width = 100
 const min_height = 30
-
-type state struct {
-	running  bool
-	drawable bool
-
-	eventQueue chan event
-
-	prevTerm *term.State
-
-	width, height int
-
-	input  *os.File
-	output *os.File
-
-	frame Frame
-	bar   Bar
-}
+const buf_size = 1024
 
 var (
 	ErrNotTerm = errors.New("output wasn't a terminal")
 )
 
+type a struct {
+	Buf  []byte
+	Size int
+	err  error
+}
+
+var (
+	box   = [...]string{"─", "│", "┌", "┐", "└", "┘", "├", "┤", "┬", "┴", "┼"}
+	round = [...]string{"╭", "╮", "╯", "╰"}
+)
+
+func Box(x, y, width, height int) string {
+	out := MoveTo(x, y) + box[2] + strings.Repeat(box[0], width-2) + box[3]
+	for i := 1; i < height-1; i++ {
+		out += MoveTo(x+i, y) + box[1] + MoveTo(x+i, y+width-1) + box[1]
+	}
+	return out + MoveTo(x+height-1, y) + box[4] + strings.Repeat(box[0], width-2) + box[5]
+}
+
 func StartTui(image_path string, input *os.File, output *os.File) error {
+	/// vars
+
+	var running bool = true
+	var width, height int
 	var err error
 
-	state := state{input: input, output: output, eventQueue: make(chan event)}
-
-	err = state.Initialize()
+	/// init
+	s, err := term.MakeRaw(output.Fd())
 	if err != nil {
-		return err
 	}
 
-	for state.running {
-		state.Draw()
+	width, height, err = term.GetSize(output.Fd())
+	if err != nil {
+	}
 
-		event := <-state.eventQueue
-		switch event := event.(type) {
-		case syscall.Signal:
-			err = state.HandleSignal(event)
+	/// sig listener
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGWINCH)
 
-		case error:
-			err = state.HandleError(event)
+	// key listener
+	r, err := cancelreader.NewReader(input)
+	if err != nil {
+	}
 
-		case string:
-			state.HandleKey(event)
+	// var str strings.Builder
+
+	// the end  of input longer than 1024 bytes will be cut off
+	keyChannel := make(chan a, 1)
+	go func() {
+		buf := make([]byte, buf_size)
+
+		for {
+			size, err := r.Read(buf)
+			if size != buf_size {
+				keyChannel <- a{Buf: buf, Size: size, err: err}
+				continue
+			}
+
+			acc := make([]byte, buf_size)
+			ss := size
+			for ss == buf_size {
+				ss, err = r.Read(acc)
+				if err != nil {
+					break
+				}
+
+				size += ss
+				buf = append(buf, acc[:ss]...)
+			}
+
+			keyChannel <- a{Buf: buf, Size: size, err: err}
+		}
+	}()
+
+	test1 := NumBox{
+		str:   "",
+		width: 10,
+	}
+
+	output.Write([]byte("\x1b[?1049h"))
+
+	for running {
+		output.WriteString("\x1b[2J")
+		output.WriteString(test1.Draw(height/2, width/2))
+		output.WriteString(Box(height/2-1, width/2-1, 12, 3))
+		output.WriteString(test1.Cursor(height/2, width/2))
+
+		// out.WriteString(Box(1, width-29, 30, height-3))
+		// out.WriteString(Box(1, 1, width-30, height))
+		// out.WriteString(Box(height-2, width-29, 30, 3))
+		// out.WriteString(MoveTo(height-1, width-28))
+		// out.WriteString(BLINKING_IBEAM)
+		// out.WriteString(MoveTo(height-1, width-28))
+		// out.WriteString(str.String())
+
+		select {
+		case signal := <-signalChannel:
+			switch signal {
+			case syscall.SIGINT, syscall.SIGTERM:
+				running = false
+
+			case syscall.SIGWINCH:
+				width, height, err = term.GetSize(output.Fd())
+				if err != nil {
+				}
+
+				///
+			}
+
+		case ev := <-keyChannel:
+			if ev.err != nil {
+			}
+
+			///
+			test1.HandleKey(string(ev.Buf[:ev.Size]))
+			if ev.Buf[0] == 'q' {
+				running = false
+			}
 		}
 	}
 
-	return errors.Join(err, state.Close())
-}
-
-func (this *state) Initialize() error {
-	if !term.IsTerminal(this.output.Fd()) {
-		return ErrNotTerm
-	}
-
-	var err error
-	this.prevTerm, err = term.MakeRaw(this.input.Fd())
-	if err != nil {
-		return err
-	}
-
-	this.width, this.height, err = term.GetSize(this.input.Fd())
-	if err != nil {
-		return err
-	}
-
-	SignalListener(this.eventQueue, syscall.SIGWINCH)
-	err = KeyboardListener(this.eventQueue, this.input)
-	if err != nil {
-		return err
-	}
-
-	this.output.Write([]byte("\x1b[2J\x1b[H"))
-
-	this.running = true
-	return nil
-}
-
-func (this *state) Close() error {
-	var err error
-
-	if this.prevTerm != nil {
-		err = term.Restore(this.output.Fd(), this.prevTerm)
-	}
-
+	output.Write([]byte("\x1b[?1049l"))
+	term.Restore(output.Fd(), s)
 	return err
-}
-
-func (frame *Frame) resize(width, height int) {}
-func (bar *Bar) resize(width, height int)     {}
-
-func (this *state) HandleSignal(sig syscall.Signal) error {
-	switch sig {
-	case syscall.SIGINT, syscall.SIGTERM:
-		this.output.Write([]byte("!"))
-		this.running = false
-
-	case syscall.SIGWINCH:
-		var err error
-		this.width, this.height, err = term.GetSize(this.input.Fd())
-		if err != nil {
-
-			// might change
-			this.running = false
-
-			return err
-		}
-
-		this.drawable = this.width >= min_height && this.height >= min_height
-		if this.drawable {
-			this.frame.resize(this.width-bar_width, this.height)
-			this.bar.resize(bar_width, this.height)
-		}
-	}
-
-	return nil
-}
-
-func (this *state) HandleError(err error) error {
-	this.running = false
-	return err
-}
-
-func (this *state) HandleKey(key string) {
-	print("new key")
-
-	if key == "q" {
-		this.running = false
-	}
-
-	this.bar.HandleKey(key) // for now
-}
-
-func (this *state) Draw() {
-	// clear canvas
-
-	// draw child
-
-	// set cursor
-
-	this.output.Write([]byte("Hello world!\n" + this.bar.Draw(5, 5)))
 }

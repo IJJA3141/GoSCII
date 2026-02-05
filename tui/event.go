@@ -11,46 +11,37 @@ import (
 
 type event any
 
-func SignalListener(out chan event, sig ...os.Signal) {
+func SignalListener(out chan event, running *bool, sig ...os.Signal) {
 	channel := make(chan os.Signal, 1)
 	signal.Notify(channel, sig...)
-	go func() { for { out <- channel } }()
+	go func() {
+		for *running {
+			out <- <-channel
+		}
+	}()
 }
 
-const BUFFER_SIZE = 1024 // way to big for utf-8
-
-func KeyboardListener(out chan event, source io.Reader) error {
-	reader, err := cancelreader.NewReader(source)
-	if err == nil { return err }
+func KeyboardListener(out chan event, running *bool, source io.Reader) error {
+	r, err := cancelreader.NewReader(source)
+	if err != nil {
+		return err
+	}
 
 	go func() {
-		var buf [BUFFER_SIZE]byte
+		// var buf [1024]byte
+		var buf [4]byte
 
-		for {
-			size, err := reader.Read(buf[:])
-			if err != nil { out <- err }
-
-			if size != BUFFER_SIZE {
-				//  TODO rm this   //
-				// fmt.Print(buf[:size])
-				// fmt.Print("\t")
-				// --------------- //
- 				out <- string(buf[:size]) 
-				continue
+		// the end  of input longer than 1024 bytes will be cut off
+		for *running {
+			size, err := r.Read(buf[:])
+			if err != nil {
+				out <- err
+			} else {
+				out <- struct {
+					Buf  []byte
+					Size int
+				}{buf[:], size}
 			}
-
-			// if theyre is more thant waht could be read 
-			// loop until all is raed
-			var acc []byte = make([]byte, 0, BUFFER_SIZE*2) // rare path
-			copy(acc, buf[:])
-
-			for size == BUFFER_SIZE {
-				size, err = reader.Read(buf[:])
-				if err != nil { out <- err }
-				acc = append(acc, buf[:size]...)
-			}
-
-			out <- string(acc)
 		}
 	}()
 
