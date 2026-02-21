@@ -7,18 +7,20 @@ import (
 
 const MOVE_TO_APROX_SIZE = len("\x1b[xxx;xxxf")
 
-func MoveTo(dst *strings.Builder, x, y int) { fmt.Fprintf(dst, "\x1b[%d;%df", x, y) }
+func MoveTo(dst *strings.Builder, x, y int) { fmt.Fprintf(dst, "\x1b[%d;%df", y, x) }
 
 // keys
 const (
 	KEY_ENTER     = "\r"
+	KEY_SHIFT_TAB = "\x1b[Z"
+	KEY_TAB       = "\t"
+	KEY_ESC       = "\x1b["
 	KEY_BACKSPACE = "\x7f" // not really
 	KEY_DEL       = "\x1b[3~"
 	KEY_UP        = "\x1b[A"
 	KEY_DOWN      = "\x1b[B"
 	KEY_RIGHT     = "\x1b[C"
 	KEY_LEFT      = "\x1b[D"
-	KEY_ESC       = "\x1b["
 )
 
 // cursor control

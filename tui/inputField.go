@@ -48,7 +48,7 @@ func (field *InputField[T]) Cursor(dst *strings.Builder) {
 
 	dst.Grow(MOVE_TO_APROX_SIZE + len(BLINKING_IBEAM) + len(SHOW_CURSOR))
 
-	MoveTo(dst, field.X, field.Y+field.cursor)
+	MoveTo(dst, field.X+field.cursor, field.Y)
 	dst.WriteString(BLINKING_IBEAM)
 	dst.WriteString(SHOW_CURSOR)
 }
@@ -108,9 +108,12 @@ func (field *InputField[T]) Blur() {
 //
 
 func (field *InputField[T]) cursorLeft() {
-	field.visual = false
+	if field.visual {
+		field.visual = false
+		field.viewStart = 0
+		field.cursor = 0
 
-	if field.cursor > 0 {
+	} else if field.cursor > 0 {
 		field.cursor--
 
 	} else if field.viewStart > 0 {
@@ -119,17 +122,26 @@ func (field *InputField[T]) cursorLeft() {
 }
 
 func (field *InputField[T]) cursorRight() {
-	field.visual = false
+	if field.visual {
+		field.visual = false
 
-	if len(field.input) < field.Width+field.viewStart {
+		if len(field.input) > field.Width {
+			field.viewStart = len(field.input) - field.Width
+			field.cursor = field.Width
+
+		} else {
+			field.viewStart = 0
+			field.cursor = len(field.input)
+		}
+
+	} else if len(field.input) < field.Width+field.viewStart {
 		field.cursor = min(field.cursor+1, len(field.input)-field.viewStart)
 
+	} else if field.cursor >= field.Width {
+		field.viewStart = min(field.viewStart+1, len(field.input)-field.Width)
+
 	} else {
-		if field.cursor >= field.Width {
-			field.viewStart = min(field.viewStart+1, len(field.input)-field.Width)
-		} else {
-			field.cursor++
-		}
+		field.cursor++
 	}
 }
 

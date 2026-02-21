@@ -30,13 +30,13 @@ func main() {
 const bar_width = 30
 const min_width = 100
 const min_height = 30
-const buf_size = 1024
+const KEY_BUFFER_SIZE = 1024
 
 var (
 	ErrNotTerm = errors.New("output wasn't a terminal")
 )
 
-type a struct {
+type Key struct {
 	Buf  []byte
 	Size int
 	err  error
@@ -62,7 +62,6 @@ func Box(dst *strings.Builder, x, y, width, height int) {
 
 func StartTui(image_path string, input *os.File, output *os.File) error {
 	/// vars
-
 	var running bool = true
 	var width, height int
 	var err error
@@ -70,10 +69,20 @@ func StartTui(image_path string, input *os.File, output *os.File) error {
 	/// init
 	s, err := term.MakeRaw(output.Fd())
 	if err != nil {
+		// TODO Handle error
 	}
+
+	// save screen & cursor
+	output.Write([]byte("\x1b[?1049h\x1b 7"))
+
+	// restore
+	defer output.WriteString("\x1b[?1049l\x1b 8" + tui.SHOW_CURSOR + tui.BLINKING_IBEAM) // term content
+	defer output.WriteString("\x1b[?25h")                                                // cursor
+	defer term.Restore(output.Fd(), s)                                                   // term settings
 
 	width, height, err = term.GetSize(output.Fd())
 	if err != nil {
+		// TODO Handle error
 	}
 
 	/// sig listener
@@ -83,74 +92,76 @@ func StartTui(image_path string, input *os.File, output *os.File) error {
 	// key listener
 	r, err := cancelreader.NewReader(input)
 	if err != nil {
+		// TODO Handle error
 	}
 
-	// var str strings.Builder
-
-	// the end  of input longer than 1024 bytes will be cut off
-	keyChannel := make(chan a, 1)
+	keyChannel := make(chan Key, 1)
 	go func() {
-		buf := make([]byte, buf_size)
+		buffer := make([]byte, KEY_BUFFER_SIZE)
 
 		for {
-			size, err := r.Read(buf)
-			if size != buf_size {
-				keyChannel <- a{Buf: buf, Size: size, err: err}
+			size, err := r.Read(buffer)
+			if size != KEY_BUFFER_SIZE || err != nil {
+				keyChannel <- Key{Buf: buffer, Size: size, err: err}
 				continue
 			}
 
-			acc := make([]byte, buf_size)
-			ss := size
-			for ss == buf_size {
-				ss, err = r.Read(acc)
-				if err != nil {
-					break
-				}
+			// if read more than buffer size
+			// enter a loop to read until
+			// read less than buffer size
 
-				size += ss
-				buf = append(buf, acc[:ss]...)
+			accSize := size
+			accBuffer := make([]byte, KEY_BUFFER_SIZE)
+			copy(accBuffer, buffer[:size])
+
+			for size == KEY_BUFFER_SIZE && err == nil {
+				size, err = r.Read(accBuffer)
+
+				accSize += size
+				accBuffer = append(accBuffer, buffer[:size]...)
 			}
 
-			keyChannel <- a{Buf: buf, Size: size, err: err}
+			keyChannel <- Key{Buf: accBuffer, Size: accSize, err: err}
 		}
 	}()
 
-	x, y := height/2, width/2
+	/// temp
+	// x, y := width/2, height/2
+	//
+	// text1 := tui.NewTextField(10, x-2, y-13)
+	// text2 := tui.NewIntField(10, x-2, y+13, false)
+	// text3 := tui.NewFloatField(4, x+2, y-20, false)
+	//
+	// check1 := tui.NewCheckBox(x+2, y+6, true)
+	// check2 := tui.NewRoundCheckBox(x+2, y+8, false)
+	// check3 := tui.NewSquaredCheckBox(x+2, y+10, true)
+	// check4 := tui.NewLockCheckBox(x+2, y+12, true)
 
-	text1 := tui.NewTextField(10, x-2, y-13)
-	text2 := tui.NewIntField(10, x-2, y+13, false)
-	text3 := tui.NewFloatField(4, x+2, y-20, false)
+	bar := tui.NewBar(30, height, width-31, 1)
 
-	check1 := tui.NewCheckBox(x+2, y+6, true)
-	check2 := tui.NewRoundCheckBox(x+2, y+8, false)
-	check3 := tui.NewSquaredCheckBox(x+2, y+10, true)
-	check4 := tui.NewLockCheckBox(x+2, y+12, true)
+	focusIndex := 0
+	// focusables := []tui.Focusable{&text1, &text2, &text3, &check1, &check2, &check3, &check4}
+	focusables := []tui.Focusable{&bar}
 
-	index := 0
-	fArr := []tui.Focusable{&text1, &text2, &text3, &check1, &check2, &check3, &check4}
-
-	output.Write([]byte("\x1b[?1049h"))
 	var b strings.Builder
 
 	for running {
 		b.Reset()
 
+		// fmt.Fprintf(&b, "\x1b[48;2;%d;%d;%dm", 0x1E, 0x1C, 0x1C)
+		// fmt.Fprintf(&b, "\x1b[48;2;%d;%d;%dm", 0xff, 0xff, 0xff)
+		fmt.Fprintf(&b, "\x1b[39;49m")
 		b.WriteString("\x1b[2J")
 
-		text1.Draw(&b)
-		text2.Draw(&b)
-		text3.Draw(&b)
+		// fmt.Fprintf(&b, "\x1b[48;2;%d;%d;%dm", 0x2C, 0x2B, 0x2B)
+		for _, focusable := range focusables {
+			// b.WriteString("[")
+			focusable.Draw(&b)
+			// b.WriteString("]")
+		}
 
-		check1.Draw(&b)
-		check2.Draw(&b)
-		check3.Draw(&b)
-		check4.Draw(&b)
-
-		// Box(&b, text1.X-1, text1.Y-1, text1.Width+2, 3)
-		// Box(&b, text2.X-1, text2.Y-1, text2.Width+2, 3)
-		// Box(&b, text3.X-1, text3.Y-1, text3.Width+2, 3)
-
-		fArr[index].Cursor(&b)
+		drawBorder(width, height, width-30, &b)
+		focusables[focusIndex].Cursor(&b)
 
 		output.WriteString(b.String())
 
@@ -174,35 +185,35 @@ func StartTui(image_path string, input *os.File, output *os.File) error {
 
 			///
 
-			fArr[index].HandleKey(string(ev.Buf[:ev.Size]))
+			focusables[focusIndex].HandleKey(string(ev.Buf[:ev.Size]))
 
-			if string(ev.Buf[:ev.Size]) == "\x1B[Z" {
-				fArr[index].Blur()
-
-				index--
-
-				if index < 0 {
-					index = len(fArr) - 1
-				}
-
-				fArr[index].Focus()
-			}
-
-			if string(ev.Buf[:ev.Size]) == "\t" {
-				fArr[index].Blur()
-
-				index++
-
-				if index >= len(fArr) {
-					index = 0
-				}
-
-				fArr[index].Focus()
-			}
-
-			if string(ev.Buf[:ev.Size]) == "\x1b" {
-				fArr[index].Blur()
-			}
+			// if string(ev.Buf[:ev.Size]) == "\x1B[Z" {
+			// 	focusables[focusIndex].Blur()
+			//
+			// 	focusIndex--
+			//
+			// 	if focusIndex < 0 {
+			// 		focusIndex = len(focusables) - 1
+			// 	}
+			//
+			// 	focusables[focusIndex].Focus()
+			// }
+			//
+			// if string(ev.Buf[:ev.Size]) == "\t" {
+			// 	focusables[focusIndex].Blur()
+			//
+			// 	focusIndex++
+			//
+			// 	if focusIndex >= len(focusables) {
+			// 		focusIndex = 0
+			// 	}
+			//
+			// 	focusables[focusIndex].Focus()
+			// }
+			//
+			// if string(ev.Buf[:ev.Size]) == "\x1b" {
+			// 	focusables[focusIndex].Blur()
+			// }
 
 			if ev.Buf[0] == 'q' {
 				running = false
@@ -210,7 +221,35 @@ func StartTui(image_path string, input *os.File, output *os.File) error {
 		}
 	}
 
-	output.Write([]byte("\x1b[?1049l"))
-	term.Restore(output.Fd(), s)
 	return err
+}
+
+func drawBorder(width, height, split int, b *strings.Builder) {
+	tui.MoveTo(b, 0, 0)
+
+	b.WriteString(round[0])
+
+	b.WriteString(strings.Repeat(box[0], split-2))
+	b.WriteString(box[8])
+	b.WriteString(strings.Repeat(box[0], width-split-1))
+
+	b.WriteString(round[1])
+
+	for i := 2; i < height; i++ {
+		tui.MoveTo(b, 0, i)
+		b.WriteString(box[1])
+
+		tui.MoveTo(b, split, i)
+		b.WriteString(box[1])
+
+		tui.MoveTo(b, width, i)
+		b.WriteString(box[1])
+	}
+
+	tui.MoveTo(b, 0, height)
+	b.WriteString(round[3])
+	b.WriteString(strings.Repeat(box[0], split-1))
+	b.WriteString(box[9])
+	b.WriteString(strings.Repeat(box[0], width-split-2))
+	b.WriteString(round[2])
 }
