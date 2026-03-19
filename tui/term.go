@@ -28,5 +28,5 @@ func DeinitializeTerm(in, out *os.File, state *term.State) {
 }
 
 func CreateUI() (Frame, Bar) {
-	return Frame{}, NewBar(Coord{X: 10, Y: 10})
+	return Frame{}, NewBar(Coords{X: 10, Y: 10})
 }

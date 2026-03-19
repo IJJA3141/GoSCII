@@ -114,7 +114,7 @@ const BAR_WIDTH = 30
 func handleResize() {
 	width, height, err := term.GetSize(int(state.out.Fd())) // TODO might need to switch with state.in
 	errors.Join(err, state.frame.Resize(width-BAR_WIDTH, height), state.bar.Resize(BAR_WIDTH, height))
-	state.bar.SetCoord(tui.Coord{X: width - BAR_WIDTH, Y: 0})
+	state.bar.SetCoord(tui.Coords{X: width - BAR_WIDTH, Y: 0})
 	if err != nil {
 		// TODO handle erorr
 	}

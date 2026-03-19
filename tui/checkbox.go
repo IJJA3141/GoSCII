@@ -11,7 +11,7 @@ type CheckBox struct {
 
 	icon [2]string // icon[0] = false, icon[1] = true
 
-	coords Coord
+	coords Coords
 	label  string
 
 	submit func(bool) bool
@@ -41,9 +41,9 @@ func (cbx *CheckBox) Resize(width, height int) (err error) {
 	return
 }
 
-func (cbx *CheckBox) Cursor(b *strings.Builder, _ Coord) { b.WriteString(HIDE_CURSOR) }
+func (cbx *CheckBox) Cursor(b *strings.Builder, _ Coords) { b.WriteString(HIDE_CURSOR) }
 
-func (cbx *CheckBox) Render(b *strings.Builder, coord Coord) {
+func (cbx *CheckBox) Render(b *strings.Builder, coord Coords) {
 	b.WriteString(MoveTo(coord.X+cbx.coords.X, coord.Y+cbx.coords.Y))
 	b.WriteString(cbx.label)
 

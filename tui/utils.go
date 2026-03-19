@@ -45,8 +45,8 @@ const (
 
 // ansi cmd
 const (
-	HILIGHT_START = "\x1b[7m"
-	HILIGHT_END   = "\x1b[27m"
+	HIGHLIGHT_START = "\x1b[7m"
+	HIGHLIGHT_END   = "\x1b[27m"
 
 	CLEAR_SCREEN = "\x1bc"
 )
