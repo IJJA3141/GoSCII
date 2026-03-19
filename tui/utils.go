@@ -2,19 +2,20 @@ package tui
 
 import (
 	"fmt"
-	"strings"
+	// "strings"
 )
 
 const MOVE_TO_APROX_SIZE = len("\x1b[xxx;xxxf")
 
-func MoveTo(dst *strings.Builder, x, y int) { fmt.Fprintf(dst, "\x1b[%d;%df", y, x) }
+// func MoveTo(dst *strings.Builder, x, y int) { fmt.Fprintf(dst, "\x1b[%d;%df", y, x) }
+func MoveTo(x, y int) string { return fmt.Sprintf("\x1b[%d;%df", y, x) }
 
 // keys
 const (
 	KEY_ENTER     = "\r"
 	KEY_SHIFT_TAB = "\x1b[Z"
 	KEY_TAB       = "\t"
-	KEY_ESC       = "\x1b["
+	KEY_ESC       = "\x1b" // ...
 	KEY_BACKSPACE = "\x7f" // not really
 	KEY_DEL       = "\x1b[3~"
 	KEY_UP        = "\x1b[A"
@@ -46,4 +47,21 @@ const (
 const (
 	HILIGHT_START = "\x1b[7m"
 	HILIGHT_END   = "\x1b[27m"
+
+	CLEAR_SCREEN = "\x1bc"
 )
+
+func increase(i, bound int) int {
+	if i < bound {
+		return i + 1
+	} else {
+		return 0
+	}
+}
+func decrease(i, bound int) int {
+	if i < 1 {
+		return bound
+	} else {
+		return i - 1
+	}
+}

@@ -1,99 +1,65 @@
-package goscii
+package main
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/IJJA3141/GoSCII/tui"
-	"github.com/charmbracelet/x/term"
 	"github.com/muesli/cancelreader"
+	"golang.org/x/term"
 )
+
+type State struct {
+	running bool
+
+	frameSelected bool
+
+	bar   tui.Bar
+	frame tui.Frame
+
+	in, out *os.File
+}
+
+var state State
 
 func main() {
 	// args parsing + initial initialState initialization
-	state = State{
-		running: false,
-	}
+
+	f, _ := os.OpenFile("info.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666) // Ignore error from opening file
+	log.SetOutput(f)
+	log.Print("\n\n\n")
+	defer f.Close()
 
 	// default for now
-	file := os.Stdin
-	state.input = file
-	state.output = file
+	state.in = os.Stdin
+	state.out = os.Stdin
+	// state.out = os.Stdout
+	state.frameSelected = false
 
-	err := start()
+	term, err := tui.InitializeTerm(state.in, state.out)
+	defer tui.DeinitializeTerm(state.in, state.out, term)
 	if err != nil {
-		fmt.Println(state.err) // TODO ERR
+		fmt.Println(err)
+		panic(-1)
+	}
+
+	state.frame, state.bar = tui.CreateUI()
+
+	err = start()
+	if err != nil {
+		fmt.Println(err)
+		panic(-1)
 	}
 
 	// write to output logic
 }
 
-/// TUI
-
-const BAR_WIDTH = 30
-const MIN_WIDTH = 100
-const MIN_HEIGHT = 35
-
-type UI int
-type Mode int
-
-const (
-	DISPLAY_NORMAL UI = iota
-	DISPLAY_ERR
-)
-
-const (
-	INPUT_NORMAL Mode = iota
-	INPUT_VISUAL
-	INPUT_NONE
-)
-
-type State struct {
-	running       bool
-	width, height int // runes
-	err           error
-	prevTerm      *term.State
-	input, output *os.File
-
-	borders tui.Borders
-	frame   tui.Frame
-	bar     tui.Bar
-
-	display     UI
-	interaction Mode
-
-	tuiBuffer strings.Builder
-}
-
-var state State
-
-func start() error {
-	/// term settings
-	// set term in raw mod and save old state
-	state.prevTerm, state.err = term.MakeRaw(state.output.Fd())
-	if state.err != nil {
-		// TODO Handle error
-		return state.err
-	}
-
-	// save screen & cursor
-	state.output.Write([]byte("\x1b[?1049h\x1b 7"))
-
-	// restore
-	defer state.output.WriteString("\x1b[?1049l\x1b 8")                                // term content
-	defer state.output.WriteString("\x1b[?25h" + tui.SHOW_CURSOR + tui.BLINKING_IBEAM) // cursor
-	defer term.Restore(state.output.Fd(), state.prevTerm)
-
-	// get term initial width and height
-	state.width, state.height, state.err = term.GetSize(state.output.Fd())
-	if state.err != nil {
-		// TODO Handle error
-		return state.err
-	}
-
+func start() (err error) {
 	/// listeners
 	// signal listener
 	signalChannel := make(chan os.Signal, 1)
@@ -101,35 +67,23 @@ func start() error {
 
 	// key listener
 	var reader cancelreader.CancelReader
-	reader, state.err = cancelreader.NewReader(state.input)
-	if state.err != nil {
-		// TODO Handle error
-		return state.err
+	reader, err = cancelreader.NewReader(state.in)
+	if err != nil {
+		return
 	}
 
 	keyChannel := make(chan tui.Key, 1)
 	tui.Notify(keyChannel, reader)
 
-	/// UI elements
-	var barleft bool
-	barleft = true
-	if barleft {
-		state.borders = tui.NewBorders(state.width, state.height, state.width-BAR_WIDTH)
-		state.frame = tui.NewFrame(state.width-BAR_WIDTH-2, state.height-2, 1+BAR_WIDTH+1, 1)
-		state.bar = tui.NewBar(BAR_WIDTH, state.height-2, 1, 1)
-
-	} else {
-		state.borders = tui.NewBorders(state.width, state.height, state.width-BAR_WIDTH)
-		state.frame = tui.NewFrame(state.width-BAR_WIDTH-2, state.height-2, 1, 1)
-		state.bar = tui.NewBar(BAR_WIDTH, state.height-2, state.width-BAR_WIDTH-1, 1)
-	}
+	var b strings.Builder
 
 	/// main loop
+	state.running = true
 	for state.running {
 		/// update frame
 
 		/// draw ui
-		drawUI()
+		render(&b)
 
 		/// await event
 		select {
@@ -145,7 +99,7 @@ func start() error {
 		case key := <-keyChannel:
 			if key.Err != nil {
 				// TODO Handle error
-				state.err = key.Err
+				err = key.Err
 			} else {
 				handleKey(string(key.Buf[:key.Size]))
 			}
@@ -155,88 +109,42 @@ func start() error {
 	return nil
 }
 
-func drawUI() {
-	// reset writer
-	state.tuiBuffer.Reset()
-	state.tuiBuffer.WriteString("\x1b[39;49m\x1b[2J")
-
-	// elements
-	switch state.display {
-	case DISPLAY_NORMAL:
-		state.borders.Draw(&state.tuiBuffer)
-		state.frame.Draw(&state.tuiBuffer)
-		state.bar.Draw(&state.tuiBuffer)
-
-	case DISPLAY_ERR:
-		// TODO handle err
-	}
-
-	// cursor
-	switch state.interaction {
-	case INPUT_NORMAL:
-		state.bar.Cursor(&state.tuiBuffer)
-
-	case INPUT_VISUAL:
-		state.frame.Cursor(&state.tuiBuffer)
-
-	default:
-		state.tuiBuffer.WriteString(tui.HIDE_CURSOR)
-	}
-
-	// write
-	state.output.WriteString(state.tuiBuffer.String())
-}
+const BAR_WIDTH = 30
 
 func handleResize() {
-	state.width, state.height, state.err = term.GetSize(state.output.Fd())
-	if state.err != nil {
-		return
+	width, height, err := term.GetSize(int(state.out.Fd())) // TODO might need to switch with state.in
+	errors.Join(err, state.frame.Resize(width-BAR_WIDTH, height), state.bar.Resize(BAR_WIDTH, height))
+	state.bar.SetCoord(tui.Coord{X: width - BAR_WIDTH, Y: 0})
+	if err != nil {
+		// TODO handle erorr
 	}
 
-	if state.width < MIN_WIDTH || state.height < MIN_HEIGHT {
-		// TODO Handle error
-		state.err = fmt.Errorf("to small")
-	}
-
-	state.borders.Resize(state.width, state.height)
-	state.frame.Resize(state.width, state.height)
-	state.bar.Resize(state.width, state.height)
 }
 
-const CRTL = rune('a') - 0x01
-
 func handleKey(key string) {
-	switch state.interaction {
-	case INPUT_NORMAL:
-		if state.bar.HandleKey(key) {
-			return
-		}
+	var handled bool
+
+	// if state.frameSelected {
+	// 	handled = state.frame.HandleKey(key)
+	//
+	// } else {
+	handled = state.bar.HandleKey(key)
+	// }
+
+	if !handled {
+		log.Printf("[main] %s\t%x\n", key, key)
 
 		switch key {
-		case "q", tui.KEY_ESC:
-			state.running = false
-
-		case string(CRTL + 'h'):
-			state.interaction = INPUT_VISUAL
-		}
-
-	case INPUT_VISUAL:
-		if state.frame.HandleKey(key) {
-			return
-		}
-
-		switch key {
-		case "q", tui.KEY_ESC:
-			state.running = false
-
-		case string(CRTL + 'l'):
-			state.interaction = INPUT_NORMAL
-		}
-
-	default:
-		switch key {
-		case "q", tui.KEY_ESC:
+		case "q", "\x03", tui.KEY_TAB:
 			state.running = false
 		}
 	}
+}
+
+func render(b *strings.Builder) {
+	b.Reset()
+	b.WriteString(tui.CLEAR_SCREEN)
+	state.bar.Render(b)
+	state.bar.Cursor(b)
+	state.out.WriteString(b.String())
 }
