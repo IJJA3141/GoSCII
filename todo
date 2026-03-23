@@ -1,5 +1,11 @@
+# ADD
+box for layout?
+
+# Cleanup
+bar
+
 # Builders
 elements should have Builders to ease creation
 
-# Fix width of InputFields
-label and such aren't included in with it should change
+# Knowed issues
+input fields have issue with non ascii chars
