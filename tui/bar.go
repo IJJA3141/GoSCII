@@ -16,12 +16,12 @@ const ( // rng for now
 
 type Bar struct {
 	focus int
-	coord Coords
+	coords Coords
 
 	inputs []Widget
 }
 
-func (br *Bar) SetCoord(coord Coords) { br.coord = coord }
+func (br *Bar) SetCoord(coord Coords) { br.coords = coord }
 
 func s(s string) bool { return ASCII_PRINTABLE_LOWER_BOUND <= s && s < ASCII_PRINTABLE_UPPER_BOUND }
 func IsVisible(s string) bool {
@@ -51,13 +51,14 @@ func NewBar(coord Coords) Bar {
 	}
 
 	widthInput := InputField[int]{
-		width: 10, minWidth: 10,
 		coords: Coords{X: 0, Y: 0},
 		label:  "W ",
 
+		width: 10, minWidth: 10,
 		format: func(i int) string {return fmt.Sprint(i)},
 		parse:  strconv.Atoi,
 		accept: s,
+
 		submit: func(i int) int { return max(0, min(i, 600)) },
 	}
 
@@ -69,22 +70,23 @@ func NewBar(coord Coords) Bar {
 		format: func(i int) string {return fmt.Sprint(i)},
 		parse:  strconv.Atoi,
 		accept: s,
+
 		submit: func(i int) int { return max(-8000, min(i, 0)) },
 	}
 
 	ratioCBX := CheckBox{
 		checked: false,
-		icon:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
+		icons:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
 
 		coords: Coords{X: 29, Y: 0},
-		label:  "",
+		label:  "Ratio ",
 
 		submit: func(b bool) bool { return b },
 	}
 
 	a := CheckBox{
 		checked: false,
-		icon:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
+		icons:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
 
 		coords: Coords{X: 0, Y: 2},
 		label:  "",
@@ -94,7 +96,7 @@ func NewBar(coord Coords) Bar {
 
 	b := CheckBox{
 		checked: false,
-		icon:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
+		icons:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
 
 		coords: Coords{X: 2, Y: 2},
 		label:  "",
@@ -104,7 +106,7 @@ func NewBar(coord Coords) Bar {
 
 	c := CheckBox{
 		checked: false,
-		icon:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
+		icons:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
 
 		coords: Coords{X: 4, Y: 2},
 		label:  "",
@@ -114,7 +116,7 @@ func NewBar(coord Coords) Bar {
 
 	d := CheckBox{
 		checked: false,
-		icon:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
+		icons:    [2]string{"\x1b[2m\x1b[22m", "\x1b[1m\x1b[22m"},
 
 		coords: Coords{X: 6, Y: 2},
 		label:  "",
@@ -124,7 +126,7 @@ func NewBar(coord Coords) Bar {
 
 	return Bar{
 		focus:  0,
-		coord:  coord,
+		coords:  coord,
 		inputs: []Widget{&widthInput, &heightInput, &ratioCBX, &a, &b, &c, &d, &testFLD},
 	}
 }
@@ -132,15 +134,15 @@ func NewBar(coord Coords) Bar {
 func (br *Bar) Render(b *strings.Builder) {
 	for i, input := range br.inputs {
 		if i != br.focus {
-			input.Render(b, br.coord)
+			input.Render(b, br.coords)
 		}
 	}
 
-	br.inputs[br.focus].Render(b, br.coord)
+	br.inputs[br.focus].Render(b, br.coords)
 }
 
 func (br *Bar) Cursor(b *strings.Builder) {
-	br.inputs[br.focus].Cursor(b, br.coord)
+	br.inputs[br.focus].Cursor(b, br.coords)
 }
 
 func (br *Bar) Resize(width, height int) (err error) {
