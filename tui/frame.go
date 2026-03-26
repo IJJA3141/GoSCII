@@ -2,13 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strings"
 )
 
 type Image interface {
-	Width() int
-	Height() int
+	Dimensions() (int, int)
 	Get(x, y, width, height int) []string
 }
 
@@ -19,13 +19,21 @@ const (
 
 type Frame struct {
 	width, height int
-	relative      Coords
+	origine       Coords
 	view          Coords // top left x, y
 
 	image Image
 }
 
-func NewFrame(a, b int, x, y int) Frame { return Frame{} }
+func NewFrame(width, height int, origine Coords, img Image) Frame {
+	return Frame{
+		width:   width,
+		height:  height,
+		origine: origine,
+		view:    Coords{0, 0},
+		image:   img,
+	}
+}
 
 // Layout & Rendering
 func (frm *Frame) Resize(width, height int) error {
@@ -39,6 +47,8 @@ func (frm *Frame) Resize(width, height int) error {
 
 	frm.height = height
 	frm.width = width
+	frm.view.X = 0
+	frm.view.Y = 0
 
 	return nil
 }
@@ -58,12 +68,15 @@ func (frm *Frame) Resize(width, height int) error {
 //	└───────┘     └───────┘     └|─────|┘   | └───────┘ |
 //	                             └ ─ ─ ┘    └ ─ ─ ─ ─ ─ ┘
 
-func (frm *Frame) Render(b *strings.Builder, origine Coords) {
-	x := origine.X + frm.relative.X
-	y := origine.Y + frm.relative.Y
+func (frm *Frame) Render(b *strings.Builder) {
+	x := frm.origine.X
+	y := frm.origine.Y
 
-	if frm.image.Height() >= frm.height {
-		if frm.image.Width() >= frm.width {
+	width, height := frm.image.Dimensions()
+
+	if height >= frm.height {
+		if width >= frm.width {
+			log.Println("case 0")
 			//  case 0
 			//
 			// 	 ┌───────┐
@@ -82,6 +95,7 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			return
 
 		} else {
+			log.Println("case 1")
 			//  case 1
 			//
 			//   ┌───────┐
@@ -91,11 +105,11 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			// └ ─ ─ ─ ─ ─ ┘
 			//   └───────┘
 
-			margin := float64(frm.width - frm.image.Width())
+			margin := float64(frm.width - width)
 			leftMargin := strings.Repeat(" ", int(math.Floor(margin)))
 			rightMargin := strings.Repeat(" ", int(math.Ceil(margin)))
 
-			for i, line := range frm.image.Get(0, frm.view.Y, frm.image.Width(), frm.height) {
+			for i, line := range frm.image.Get(0, frm.view.Y, width, frm.height) {
 				b.WriteString(MoveTo(x, y+i))
 				b.WriteString(leftMargin)
 				b.WriteString(line)
@@ -105,7 +119,8 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			return
 		}
 	} else {
-		if frm.image.Width() > frm.width {
+		if width > frm.width {
+			log.Println("case 2")
 			//  case 2
 			//    ┌ ─ ─ ┐
 			//   ┌|─────|┐
@@ -116,7 +131,7 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			//   └|─────|┘
 			//    └ ─ ─ ┘
 
-			margin := float64(frm.height-frm.image.Height()) / 2.
+			margin := float64(frm.height-height) / 2.
 			emptyLine := strings.Repeat(" ", frm.width)
 
 			var i int
@@ -125,7 +140,7 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 				b.WriteString(emptyLine)
 			}
 
-			for _, line := range frm.image.Get(frm.view.X, 0, frm.width, frm.image.Height()) {
+			for _, line := range frm.image.Get(frm.view.X, 0, frm.width, height) {
 				b.WriteString(MoveTo(x, y+i))
 				b.WriteString(line)
 				i++
@@ -140,6 +155,7 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			return
 
 		} else { // CASE3
+			log.Println("case 3")
 			//  case 3
 			// ┌ ─ ─ ─ ─ ─ ┐
 			// | ┌───────┐ |
@@ -150,8 +166,8 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 			// | └───────┘ |
 			// └ ─ ─ ─ ─ ─ ┘
 
-			vmargin := float64(frm.height-frm.image.Height()) / 2.
-			hmargin := float64(frm.width-frm.image.Width()) / 2.
+			vmargin := float64(frm.height-height) / 2.
+			hmargin := float64(frm.width-width) / 2.
 			emptyLine := strings.Repeat(" ", frm.width)
 
 			var i int
@@ -160,7 +176,7 @@ func (frm *Frame) Render(b *strings.Builder, origine Coords) {
 				b.WriteString(emptyLine)
 			}
 
-			for _, line := range frm.image.Get(frm.view.X, frm.view.Y, frm.image.Width(), frm.image.Width()) {
+			for _, line := range frm.image.Get(frm.view.X, frm.view.Y, width, height) {
 				b.WriteString(MoveTo(x, y+i))
 				b.WriteString(emptyLine[:int(math.Floor(hmargin))])
 				b.WriteString(line)

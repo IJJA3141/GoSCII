@@ -14,7 +14,7 @@ type InputField[T any] struct {
 	label  string
 
 	buffer []rune
-	value  T
+	Value  T
 
 	format func(T) string
 	parse  func(string) (T, error)
@@ -168,11 +168,11 @@ func (fld *InputField[T]) Blur() {
 	// if parsed successfully try to submit and update with new value
 	// else return to previous valid value
 	if err == nil {
-		fld.value = fld.submit(value)
+		fld.Value = fld.submit(value)
 	}
 
 	// display new value
-	fld.buffer = []rune(fld.format(fld.value))
+	fld.buffer = []rune(fld.format(fld.Value))
 
 	// remove focus
 	fld.focused = false

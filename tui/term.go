@@ -27,6 +27,6 @@ func DeinitializeTerm(in, out *os.File, state *term.State) {
 	term.Restore(int(in.Fd()), state)
 }
 
-func CreateUI() (Frame, Bar) {
-	return Frame{}, NewBar(Coords{X: 10, Y: 10})
+func CreateUI(width, height int, img Image) (Frame, Bar) {
+	return NewFrame(width-BAR_MIN_WIDTH, height, Coords{0, 0}, img), NewBar(Coords{X: width - BAR_MIN_WIDTH, Y: 0})
 }
